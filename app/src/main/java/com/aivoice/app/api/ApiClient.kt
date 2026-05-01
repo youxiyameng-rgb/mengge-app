@@ -43,8 +43,7 @@ object ApiClient {
     }
 
     /**
-     * AI 配音 - TTS 语音合成
-     * 兼容 SiliconFlow / OpenAI / Fish Speech 的 /v1/audio/speech 接口
+     * AI 配音 - TTS 语音合成（SiliconFlow）
      */
     suspend fun synthesizeSpeech(
         baseUrl: String, apiKey: String, text: String,
@@ -75,44 +74,85 @@ object ApiClient {
     }
 
     /**
-     * AI 翻唱 - 使用 Chat Completions 生成翻唱建议
+     * AI 翻唱 - 使用 Replicate RVC voice conversion
+     * 上传原唱音频 + 目标声音参考音频 → 输出翻唱音频
      */
-    suspend fun generateCover(baseUrl: String, apiKey: String, songName: String, lyrics: String, model: String = "Qwen/Qwen3-8B"): String? {
-        val url = "${baseUrl.trimEnd('/')}/v1/chat/completions"
-        val body = JSONObject().apply {
-            put("model", model)
-            put("messages", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("role", "system")
-                    put("content", "你是一个AI翻唱助手。根据用户提供的歌曲名和歌词，返回翻唱建议和编曲风格。")
-                })
-                put(JSONObject().apply {
-                    put("role", "user")
-                    put("content", "歌曲：$songName\n歌词：$lyrics\n请生成翻唱建议，包括编曲风格、音色推荐和节奏建议。")
-                })
+    suspend fun generateCover(
+        replicateToken: String,
+        songAudioPath: String,
+        targetVoicePath: String
+    ): String? {
+        // Step 1: Upload song file to Replicate
+        val songUrl = uploadFileToReplicate(replicateToken, songAudioPath) ?: return null
+        // Step 2: Upload target voice file
+        val voiceUrl = uploadFileToReplicate(replicateToken, targetVoicePath) ?: return null
+
+        // Step 3: Create prediction using RVC voice conversion model
+        val createBody = JSONObject().apply {
+            put("version", "951a50b3a415d10643c75e0337b9b6d7c1a1b8f7e45d0f72c6c0c7b5b3b0a9f8")
+            put("input", JSONObject().apply {
+                put("song_input", songUrl)
+                put("voice_ref", voiceUrl)
+                put("f0_method", "rmvpe")
+                put("protect", 0.33)
             })
-            put("max_tokens", 1000)
         }
-        val request = Request.Builder()
-            .url(url)
-            .addHeader("Authorization", "Bearer $apiKey")
+
+        val createRequest = Request.Builder()
+            .url("https://api.replicate.com/v1/predictions")
+            .addHeader("Authorization", "Bearer $replicateToken")
             .addHeader("Content-Type", "application/json")
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .post(createBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
-        val response = client.newCall(request).execute()
-        if (response.isSuccessful) {
-            val responseBody = response.body?.string()
-            val json = JSONObject(responseBody)
-            return json.getJSONArray("choices").getJSONObject(0)
-                .getJSONObject("message").getString("content")
-        }
-        return null
+
+        val createResponse = client.newCall(createRequest).execute()
+        if (!createResponse.isSuccessful) return null
+        val createResult = JSONObject(createResponse.body?.string() ?: return null)
+        val predictionId = createResult.getString("id")
+
+        // Step 4: Poll for completion
+        return pollReplicateResult(replicateToken, predictionId, "cover_${System.currentTimeMillis()}.wav")
     }
 
     /**
-     * 声音克隆 - 上传参考音频 + 用该声音合成
-     * SiliconFlow 支持上传参考音频到 /v1/audio/voice
-     * 然后用返回的 voice ID 进行 TTS
+     * 伴奏分离 - 使用 Replicate Demucs model
+     * 上传歌曲音频 → 输出分离后的人声和伴奏
+     */
+    suspend fun separateTracks(
+        replicateToken: String,
+        songAudioPath: String
+    ): String? {
+        // Step 1: Upload song file
+        val songUrl = uploadFileToReplicate(replicateToken, songAudioPath) ?: return null
+
+        // Step 2: Create prediction using Demucs model
+        val createBody = JSONObject().apply {
+            put("version", "0712bdbb26d1bc43c48aa0cdc0a9e2c2b8c2a0fe56a4e5cc1c0c1f2e3e5b0aa0")
+            put("input", JSONObject().apply {
+                put("audio", songUrl)
+                put("model", "htdemucs")
+                put("stem", "vocals")
+            })
+        }
+
+        val createRequest = Request.Builder()
+            .url("https://api.replicate.com/v1/predictions")
+            .addHeader("Authorization", "Bearer $replicateToken")
+            .addHeader("Content-Type", "application/json")
+            .post(createBody.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val createResponse = client.newCall(createRequest).execute()
+        if (!createResponse.isSuccessful) return null
+        val createResult = JSONObject(createResponse.body?.string() ?: return null)
+        val predictionId = createResult.getString("id")
+
+        // Step 3: Poll for completion
+        return pollReplicateResult(replicateToken, predictionId, "separated_${System.currentTimeMillis()}.wav")
+    }
+
+    /**
+     * 声音克隆 - 上传参考音频 + 用该声音合成（SiliconFlow）
      */
     suspend fun cloneVoice(
         baseUrl: String, apiKey: String, text: String,
@@ -149,10 +189,79 @@ object ApiClient {
         return null
     }
 
-    /**
-     * 上传参考音频到 SiliconFlow
-     * POST /v1/audio/voice
-     */
+    // ========== Replicate helpers ==========
+
+    private fun uploadFileToReplicate(token: String, filePath: String): String? {
+        val file = File(filePath)
+        if (!file.exists()) return null
+
+        // Try direct file upload
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "content", file.name,
+                file.asRequestBody("audio/wav".toMediaType())
+            )
+            .build()
+
+        val request = Request.Builder()
+            .url("https://api.replicate.com/v1/files")
+            .addHeader("Authorization", "Bearer $token")
+            .post(requestBody)
+            .build()
+
+        val response = client.newCall(request).execute()
+        if (response.isSuccessful) {
+            val json = JSONObject(response.body?.string() ?: return null)
+            return json.optString("urls", json.optString("url", null))
+                ?: json.getJSONObject("urls")?.optString("get", null)
+        }
+        return null
+    }
+
+    private fun pollReplicateResult(token: String, predictionId: String, fileName: String): String? {
+        for (i in 0..60) {
+            Thread.sleep(5000)
+            val request = Request.Builder()
+                .url("https://api.replicate.com/v1/predictions/$predictionId")
+                .addHeader("Authorization", "Bearer $token")
+                .build()
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                val json = JSONObject(response.body?.string() ?: continue)
+                val status = json.getString("status")
+                when (status) {
+                    "succeeded" -> {
+                        val output = json.get("output")
+                        val downloadUrl = when (output) {
+                            is JSONArray -> output.getString(0)
+                            is String -> output
+                            else -> return null
+                        }
+                        return downloadAndSave(downloadUrl, fileName)
+                    }
+                    "failed", "canceled" -> return null
+                }
+            }
+        }
+        return null
+    }
+
+    private fun downloadAndSave(url: String, fileName: String): String? {
+        val request = Request.Builder().url(url).build()
+        val response = client.newCall(request).execute()
+        if (response.isSuccessful) {
+            val file = File(getDownloadDir(), fileName)
+            response.body?.byteStream()?.use { input ->
+                FileOutputStream(file).use { output -> input.copyTo(output) }
+            }
+            return file.absolutePath
+        }
+        return null
+    }
+
+    // ========== SiliconFlow helpers ==========
+
     private fun uploadReferenceAudio(baseUrl: String, apiKey: String, audioPath: String, model: String): String? {
         val url = "${baseUrl.trimEnd('/')}/v1/audio/voice"
         val audioFile = File(audioPath)
@@ -178,43 +287,7 @@ object ApiClient {
         if (response.isSuccessful) {
             val responseBody = response.body?.string()
             val json = JSONObject(responseBody)
-            // SiliconFlow returns { "uri": "xxxx" }
             return json.optString("uri", json.optString("id", json.optString("voice_id", null)))
-        }
-        return null
-    }
-
-    /**
-     * 伴奏分离建议
-     */
-    suspend fun separateTracks(baseUrl: String, apiKey: String, model: String = "Qwen/Qwen3-8B"): String? {
-        val url = "${baseUrl.trimEnd('/')}/v1/chat/completions"
-        val body = JSONObject().apply {
-            put("model", model)
-            put("messages", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("role", "system")
-                    put("content", "你是一个音频分离助手。帮助用户理解伴奏分离的流程和工具推荐。")
-                })
-                put(JSONObject().apply {
-                    put("role", "user")
-                    put("content", "请告诉我如何使用当前API进行伴奏分离，推荐可用的分离工具和方法。")
-                })
-            })
-            put("max_tokens", 800)
-        }
-        val request = Request.Builder()
-            .url(url)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Content-Type", "application/json")
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-        val response = client.newCall(request).execute()
-        if (response.isSuccessful) {
-            val responseBody = response.body?.string()
-            val json = JSONObject(responseBody)
-            return json.getJSONArray("choices").getJSONObject(0)
-                .getJSONObject("message").getString("content")
         }
         return null
     }

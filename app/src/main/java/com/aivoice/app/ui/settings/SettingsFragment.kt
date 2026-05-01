@@ -13,18 +13,19 @@ import android.view.ViewGroup
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.aivoice.app.R
 import com.aivoice.app.api.ApiClient
 import com.aivoice.app.databinding.FragmentSettingsBinding
 import com.aivoice.app.util.IconManager
+import kotlin.math.min
 
 class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
+    private val iconColors = listOf("#9C27B0", "#2196F3", "#E91E63", "#4CAF50", "#FF9800")
+    private var selectedColorIndex = 0
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
@@ -34,96 +35,68 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         loadSettings()
-        binding.btnSave.setOnClickListener { saveSettings() }
-        setupIconSelector()
+        setupIconPicker()
+
+        binding.btnSaveSettings.setOnClickListener {
+            saveSettings()
+            Toast.makeText(requireContext(), "✅ 设置已保存", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    private fun setupIconSelector() {
-        val currentKey = IconManager.getCurrentIconKey(requireContext())
-        updateCurrentIconPreview(currentKey)
-
-        val grid = binding.gridIcons
-        grid.removeAllViews()
-
-        val iconDrawables = mapOf(
-            "purple" to R.drawable.ic_launcher_purple,
-            "blue" to R.drawable.ic_launcher_blue,
-            "pink" to R.drawable.ic_launcher_pink,
-            "green" to R.drawable.ic_launcher_green,
-            "orange" to R.drawable.ic_launcher_orange
-        )
-
-        for (theme in IconManager.ICON_THEMES) {
-            val resId = iconDrawables[theme.key] ?: continue
-
-            // Container with icon + label
-            val container = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_HORIZONTAL
-                val size = resources.displayMetrics.widthPixels / 6
+    private fun setupIconPicker() {
+        val container = binding.iconPickerContainer
+        val iconSize = dpToPx(48)
+        val margin = dpToPx(8)
+        
+        iconColors.forEachIndexed { index, color ->
+            val iconView = ImageView(requireContext()).apply {
                 layoutParams = GridLayout.LayoutParams().apply {
-                    width = 0
-                    height = ViewGroup.LayoutParams.WRAP_CONTENT
-                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                    width = iconSize
+                    height = iconSize
+                    setMargins(margin, margin, margin, margin)
+                    columnSpec = GridLayout.spec(index)
+                    rowSpec = GridLayout.spec(0)
                 }
-                setPadding(8, 8, 8, 8)
-            }
-
-            val imgView = ImageView(requireContext()).apply {
-                setImageResource(resId)
-                layoutParams = LinearLayout.LayoutParams(120, 120)
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                // 当前选中的加边框
-                if (theme.key == currentKey) {
-                    background = createHighlightBorder()
+                setImageResource(when(index) {
+                    0 -> R.drawable.ic_launcher_purple
+                    1 -> R.drawable.ic_launcher_blue
+                    2 -> R.drawable.ic_launcher_pink
+                    3 -> R.drawable.ic_launcher_green
+                    else -> R.drawable.ic_launcher_orange
+                })
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dpToPx(8).toFloat()
+                    setStroke(3, android.graphics.Color.parseColor(
+                        if (index == selectedColorIndex) "#333333" else "#EEEEEE"
+                    ))
                 }
+                setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+                setOnClickListener { selectIcon(index) }
             }
-
-            val labelView = TextView(requireContext()).apply {
-                text = theme.name.substringAfter(" ")  // 去掉 emoji，保留中文
-                textSize = 11f
-                gravity = Gravity.CENTER
-                setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
-            }
-
-            container.addView(imgView)
-            container.addView(labelView)
-
-            container.setOnClickListener {
-                if (theme.key == currentKey) return@setOnClickListener
-                IconManager.applyIcon(requireContext(), theme.key)
-                Toast.makeText(requireContext(), "图标已切换为${theme.name}，桌面即将更新", Toast.LENGTH_SHORT).show()
-                // 延迟刷新 UI，给系统一点时间
-                Handler(Looper.getMainLooper()).postDelayed({
-                    if (isAdded) {
-                        setupIconSelector() // 刷新选中状态
-                    }
-                }, 500)
-            }
-
-            grid.addView(container)
+            container.addView(iconView)
         }
     }
 
-    private fun createHighlightBorder(): GradientDrawable {
-        return GradientDrawable().apply {
-            setStroke(4, 0xFF6C63FF.toInt())
-            cornerRadius = 16f
-            setColor(0x1A6C63FF.toInt()) // 浅紫背景
-        }
+    private fun selectIcon(index: Int) {
+        selectedColorIndex = index
+        IconManager.setIcon(requireContext(), iconColors[index])
+        updateIconSelection()
+        Toast.makeText(requireContext(), "图标颜色已切换！", Toast.LENGTH_SHORT).show()
     }
 
-    private fun updateCurrentIconPreview(currentKey: String) {
-        val iconDrawables = mapOf(
-            "purple" to R.drawable.ic_launcher_purple,
-            "blue" to R.drawable.ic_launcher_blue,
-            "pink" to R.drawable.ic_launcher_pink,
-            "green" to R.drawable.ic_launcher_green,
-            "orange" to R.drawable.ic_launcher_orange
-        )
-        binding.imgCurrentIcon.setImageResource(iconDrawables[currentKey] ?: R.drawable.ic_launcher_purple)
-        val theme = IconManager.ICON_THEMES.find { it.key == currentKey }
-        binding.tvCurrentIconName.text = "当前图标：${theme?.name ?: "紫色默认"}"
+    private fun updateIconSelection() {
+        val container = binding.iconPickerContainer
+        for (i in 0 until container.childCount) {
+            val iconView = container.getChildAt(i)
+            iconView.background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dpToPx(8).toFloat()
+                setStroke(3, android.graphics.Color.parseColor(
+                    if (i == selectedColorIndex) "#333333" else "#EEEEEE"
+                ))
+            }
+        }
     }
 
     private fun loadSettings() {
@@ -131,17 +104,22 @@ class SettingsFragment : Fragment() {
         binding.editApiKey.setText(prefs.getString("api_key", ""))
         binding.editBaseUrl.setText(prefs.getString("base_url", ApiClient.DEFAULT_BASE_URL))
         binding.editModel.setText(prefs.getString("model_name", ApiClient.DEFAULT_MODEL))
+        binding.editReplicateToken.setText(prefs.getString("replicate_token", ""))
     }
 
     private fun saveSettings() {
         val prefs = requireContext().getSharedPreferences("api_settings", Context.MODE_PRIVATE)
         prefs.edit().apply {
-            putString("api_key", binding.editApiKey.text.toString())
-            putString("base_url", binding.editBaseUrl.text.toString())
-            putString("model_name", binding.editModel.text.toString())
+            putString("api_key", binding.editApiKey.text.toString().trim())
+            putString("base_url", binding.editBaseUrl.text.toString().trim().ifEmpty { ApiClient.DEFAULT_BASE_URL })
+            putString("model_name", binding.editModel.text.toString().trim().ifEmpty { ApiClient.DEFAULT_MODEL })
+            putString("replicate_token", binding.editReplicateToken.text.toString().trim())
             apply()
         }
-        Toast.makeText(requireContext(), "设置已保存", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return (dp * resources.displayMetrics.density).toInt()
     }
 
     override fun onDestroyView() { super.onDestroyView(); _binding = null }
