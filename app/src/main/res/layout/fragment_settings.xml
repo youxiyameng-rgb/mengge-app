@@ -152,7 +152,7 @@
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/edit_api_key" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:hint="API Key"
-            android:inputType="textPassword" />
+            android:inputType="text" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
@@ -194,7 +194,7 @@
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/edit_replicate_token" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:hint="Replicate API Token (用于翻唱和伴奏分离)"
-            android:inputType="textPassword" />
+            android:inputType="text" />
     </com.google.android.material.textfield.TextInputLayout>
 
     <Button android:id="@+id/btn_save"
