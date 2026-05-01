@@ -213,8 +213,9 @@ object ApiClient {
         val response = client.newCall(request).execute()
         if (response.isSuccessful) {
             val json = JSONObject(response.body?.string() ?: return null)
-            return json.optString("urls", json.optString("url", null))
-                ?: json.getJSONObject("urls")?.optString("get", null)
+            val urlsObj = json.optJSONObject("urls")
+            return urlsObj?.optString("get", null)
+                ?: json.optString("url", null)
         }
         return null
     }
