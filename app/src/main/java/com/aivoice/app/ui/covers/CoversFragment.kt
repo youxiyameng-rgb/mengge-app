@@ -10,7 +10,9 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.aivoice.app.api.ApiClient
 import com.aivoice.app.databinding.FragmentCoversBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class CoversFragment : Fragment() {
     private var _binding: FragmentCoversBinding? = null
@@ -33,11 +35,14 @@ class CoversFragment : Fragment() {
         val prefs = requireContext().getSharedPreferences("api_settings", Context.MODE_PRIVATE)
         val apiKey = prefs.getString("api_key", "") ?: ""
         val baseUrl = prefs.getString("base_url", "") ?: ""
+        val model = prefs.getString("model_name", "fish-speech-1.5") ?: "fish-speech-1.5"
         if (apiKey.isEmpty() || baseUrl.isEmpty()) { Toast.makeText(requireContext(), "请先在设置中配置 API", Toast.LENGTH_SHORT).show(); return }
         binding.progressBar.visibility = View.VISIBLE; binding.btnGenerate.isEnabled = false
         lifecycleScope.launch {
             try {
-                val result = ApiClient.generateCover(baseUrl, apiKey, songName, lyrics)
+                val result = withContext(Dispatchers.IO) {
+                    ApiClient.generateCover(baseUrl, apiKey, songName, lyrics, model)
+                }
                 binding.progressBar.visibility = View.GONE; binding.btnGenerate.isEnabled = true
                 binding.tvStatus.text = if (result != null) "✅ 翻唱建议:\n$result" else "❌ 生成失败"
             } catch (e: Exception) {

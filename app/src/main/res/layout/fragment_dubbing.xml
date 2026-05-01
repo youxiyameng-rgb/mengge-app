@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:layout_height="match_parent">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="16dp">
 
     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
         android:text="🗣️ AI 配音" android:textSize="22sp" android:textStyle="bold"
         android:layout_marginBottom="16dp" />
+
+    <!-- 音色选择 -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="选择音色" android:textSize="14sp" android:textColor="#666666"
+        android:layout_marginBottom="6dp" />
+
+    <Spinner android:id="@+id/spinner_voice"
+        android:layout_width="match_parent" android:layout_height="48dp"
+        android:background="@android:drawable/btn_dropdown"
+        android:layout_marginBottom="12dp" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -30,5 +40,25 @@
 
     <TextView android:id="@+id/tv_status"
         android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:textSize="14sp" android:layout_marginTop="8dp" />
+        android:textSize="14sp" android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp" />
+
+    <!-- 播放控制 -->
+    <LinearLayout android:id="@+id/layout_playback"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center"
+        android:layout_marginTop="12dp" android:visibility="gone">
+
+        <Button android:id="@+id/btn_play"
+            android:layout_width="0dp" android:layout_height="48dp"
+            android:layout_weight="1" android:text="▶️ 播放"
+            android:backgroundTint="#43E97B" android:layout_marginEnd="8dp" />
+
+        <Button android:id="@+id/btn_share"
+            android:layout_width="0dp" android:layout_height="48dp"
+            android:layout_weight="1" android:text="📤 分享"
+            android:backgroundTint="#FF6584" />
+    </LinearLayout>
+
 </LinearLayout>
+</ScrollView>
