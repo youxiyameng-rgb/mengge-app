@@ -34,9 +34,9 @@ class CoversFragment : Fragment() {
         if (songName.isEmpty() || lyrics.isEmpty()) { Toast.makeText(requireContext(), "请填写歌曲名和歌词", Toast.LENGTH_SHORT).show(); return }
         val prefs = requireContext().getSharedPreferences("api_settings", Context.MODE_PRIVATE)
         val apiKey = prefs.getString("api_key", "") ?: ""
-        val baseUrl = prefs.getString("base_url", "") ?: ""
-        val model = prefs.getString("model_name", "fish-speech-1.5") ?: "fish-speech-1.5"
-        if (apiKey.isEmpty() || baseUrl.isEmpty()) { Toast.makeText(requireContext(), "请先在设置中配置 API", Toast.LENGTH_SHORT).show(); return }
+        val baseUrl = prefs.getString("base_url", ApiClient.DEFAULT_BASE_URL) ?: ApiClient.DEFAULT_BASE_URL
+        val model = prefs.getString("model_name", ApiClient.DEFAULT_MODEL) ?: ApiClient.DEFAULT_MODEL
+        if (apiKey.isEmpty()) { Toast.makeText(requireContext(), "请先在设置中配置 API Key", Toast.LENGTH_SHORT).show(); return }
         binding.progressBar.visibility = View.VISIBLE; binding.btnGenerate.isEnabled = false
         lifecycleScope.launch {
             try {

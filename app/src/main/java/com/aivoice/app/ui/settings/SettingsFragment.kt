@@ -18,6 +18,7 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.aivoice.app.R
+import com.aivoice.app.api.ApiClient
 import com.aivoice.app.databinding.FragmentSettingsBinding
 import com.aivoice.app.util.IconManager
 
@@ -128,8 +129,8 @@ class SettingsFragment : Fragment() {
     private fun loadSettings() {
         val prefs = requireContext().getSharedPreferences("api_settings", Context.MODE_PRIVATE)
         binding.editApiKey.setText(prefs.getString("api_key", ""))
-        binding.editBaseUrl.setText(prefs.getString("base_url", ""))
-        binding.editModel.setText(prefs.getString("model_name", ""))
+        binding.editBaseUrl.setText(prefs.getString("base_url", ApiClient.DEFAULT_BASE_URL))
+        binding.editModel.setText(prefs.getString("model_name", ApiClient.DEFAULT_MODEL))
     }
 
     private fun saveSettings() {

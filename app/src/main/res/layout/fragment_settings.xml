@@ -129,7 +129,7 @@
         android:orientation="vertical" android:background="#F5F5FF"
         android:padding="14dp" android:layout_marginBottom="20dp">
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="1️⃣ 请先在下方「API 设置」中填写你的 API Key 和 Base URL\n\n2️⃣ 推荐使用 Fish Speech（免费开源）部署后填入地址\n\n3️⃣ 生成的音频文件保存在手机「下载/AIVoice」目录\n\n4️⃣ 建议在 Wi-Fi 环境下使用，避免消耗流量\n\n5️⃣ API 调用会产生费用，请关注你的 API 账户余额"
+            android:text="1️⃣ 去 https://siliconflow.cn 注册账号，获取免费 API Key\n\n2️⃣ 在下方「API 设置」中粘贴你的 API Key（其余已默认填好）\n\n3️⃣ 配音页选择音色 → 输入文本 → 点击生成即可\n\n4️⃣ 生成的音频文件保存在手机「下载/AIVoice」目录\n\n5️⃣ 免费额度用完后可在 SiliconFlow 后台充值，价格非常便宜"
             android:textSize="13sp" android:textColor="#555555" android:lineSpacingMultiplier="1.5" />
     </LinearLayout>
 
@@ -143,7 +143,7 @@
         android:layout_marginBottom="8dp" />
 
     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:text="填写你自己的 API Key 和 Base URL\n推荐 Fish Speech: https://api.fish.audio"
+        android:text="填写 API Key 即可使用\n默认使用硅基流动 SiliconFlow（注册即送免费额度）\n官网: https://siliconflow.cn"
         android:textSize="13sp" android:textColor="#888888" android:layout_marginBottom="20dp" />
 
     <com.google.android.material.textfield.TextInputLayout
@@ -161,7 +161,7 @@
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/edit_base_url" android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Base URL (如 https://api.fish.audio)"
+            android:hint="Base URL (默认 https://api.siliconflow.cn)"
             android:inputType="textUri" />
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -171,7 +171,7 @@
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/edit_model" android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="模型名称 (如 fish-speech-1.5)"
+            android:hint="模型名称 (默认 fnlp/MOSS-TTSD-v0.5)"
             android:inputType="text" />
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -228,7 +228,7 @@
         android:text="🌐 支持平台" android:textSize="18sp" android:textStyle="bold"
         android:layout_marginBottom="8dp" />
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="• Fish Audio (api.fish.audio) - 推荐免费开源\n• OpenAI (api.openai.com)\n• 智谱 (open.bigmodel.cn)\n• 通义千问 (dashscope.aliyuncs.com)\n• 其他 OpenAI 兼容 API"
+        android:text="• 硅基流动 (api.siliconflow.cn) - 推荐，注册送免费额度\n• Fish Audio (api.fish.audio) - 自部署\n• OpenAI (api.openai.com)\n• 智谱 (open.bigmodel.cn)\n• 通义千问 (dashscope.aliyuncs.com)\n• 其他 OpenAI 兼容 API"
         android:textSize="13sp" android:textColor="#666666" android:lineSpacingMultiplier="1.4" />
 
     <!-- ====== 版本信息 ====== -->

@@ -49,21 +49,22 @@ class DubbingFragment : Fragment() {
         if (text.isEmpty()) { Toast.makeText(requireContext(), "请输入文本", Toast.LENGTH_SHORT).show(); return }
         val prefs = requireContext().getSharedPreferences("api_settings", Context.MODE_PRIVATE)
         val apiKey = prefs.getString("api_key", "") ?: ""
-        val baseUrl = prefs.getString("base_url", "") ?: ""
-        val model = prefs.getString("model_name", "fish-speech-1.5") ?: "fish-speech-1.5"
-        if (apiKey.isEmpty() || baseUrl.isEmpty()) { Toast.makeText(requireContext(), "请先在设置中配置 API", Toast.LENGTH_SHORT).show(); return }
+        val baseUrl = prefs.getString("base_url", ApiClient.DEFAULT_BASE_URL) ?: ApiClient.DEFAULT_BASE_URL
+        val model = prefs.getString("model_name", ApiClient.DEFAULT_MODEL) ?: ApiClient.DEFAULT_MODEL
+        if (apiKey.isEmpty()) { Toast.makeText(requireContext(), "请先在设置中配置 API Key", Toast.LENGTH_SHORT).show(); return }
 
         val selectedVoice = binding.spinnerVoice.selectedItemPosition
-        val voiceId = ApiClient.VOICE_PRESETS[selectedVoice].id
+        val voiceValue = ApiClient.VOICE_PRESETS[selectedVoice].voiceValue
 
         binding.progressBar.visibility = View.VISIBLE
         binding.btnGenerate.isEnabled = false
         binding.layoutPlayback.visibility = View.GONE
+        binding.tvStatus.text = "⏳ 正在生成配音..."
 
         lifecycleScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
-                    ApiClient.synthesizeSpeech(baseUrl, apiKey, text, model, voiceId)
+                    ApiClient.synthesizeSpeech(baseUrl, apiKey, text, model, voiceValue)
                 }
                 binding.progressBar.visibility = View.GONE
                 binding.btnGenerate.isEnabled = true
@@ -71,10 +72,9 @@ class DubbingFragment : Fragment() {
                     currentFilePath = result
                     binding.tvStatus.text = "✅ 生成成功！"
                     binding.layoutPlayback.visibility = View.VISIBLE
-                    // 自动播放
                     playAudio()
                 } else {
-                    binding.tvStatus.text = "❌ 生成失败，请检查 API 配置"
+                    binding.tvStatus.text = "❌ 生成失败，请检查 API Key 是否正确"
                 }
             } catch (e: Exception) {
                 binding.progressBar.visibility = View.GONE

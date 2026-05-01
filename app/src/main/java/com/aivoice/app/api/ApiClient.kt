@@ -19,19 +19,22 @@ object ApiClient {
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    // Fish Speech 预设音色
+    const val DEFAULT_BASE_URL = "https://api.siliconflow.cn"
+    const val DEFAULT_MODEL = "fnlp/MOSS-TTSD-v0.5"
+
+    // SiliconFlow 预设音色
     val VOICE_PRESETS = listOf(
-        VoicePreset("alex", "Alex (英文男声)"),
-        VoicePreset("anna", "Anna (英文女声)"),
-        VoicePreset("bella", "Bella (英文女声)"),
-        VoicePreset("elliot", "Elliot (英文男声)"),
-        VoicePreset("josh", "Josh (英文男声)"),
-        VoicePreset("nicole", "Nicole (英文女声)"),
-        VoicePreset("sam", "Sam (英文男声)"),
-        VoicePreset("custom", "🎭 自定义参考音频")
+        VoicePreset("alex", "Alex (男声)", "fnlp/MOSS-TTSD-v0.5:alex"),
+        VoicePreset("anna", "Anna (女声)", "fnlp/MOSS-TTSD-v0.5:anna"),
+        VoicePreset("bella", "Bella (女声)", "fnlp/MOSS-TTSD-v0.5:bella"),
+        VoicePreset("benjamin", "Benjamin (男声)", "fnlp/MOSS-TTSD-v0.5:benjamin"),
+        VoicePreset("charles", "Charles (男声)", "fnlp/MOSS-TTSD-v0.5:charles"),
+        VoicePreset("claire", "Claire (女声)", "fnlp/MOSS-TTSD-v0.5:claire"),
+        VoicePreset("david", "David (男声)", "fnlp/MOSS-TTSD-v0.5:david"),
+        VoicePreset("diana", "Diana (女声)", "fnlp/MOSS-TTSD-v0.5:diana")
     )
 
-    data class VoicePreset(val id: String, val name: String)
+    data class VoicePreset(val id: String, val name: String, val voiceValue: String)
 
     private fun getDownloadDir(): File {
         val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "AIVoice")
@@ -41,11 +44,11 @@ object ApiClient {
 
     /**
      * AI 配音 - TTS 语音合成
-     * 兼容 Fish Speech 和 OpenAI 的 /v1/audio/speech 接口
+     * 兼容 SiliconFlow / OpenAI / Fish Speech 的 /v1/audio/speech 接口
      */
     suspend fun synthesizeSpeech(
         baseUrl: String, apiKey: String, text: String,
-        model: String = "fish-speech-1.5", voice: String = "alex"
+        model: String = DEFAULT_MODEL, voice: String = VOICE_PRESETS[0].voiceValue
     ): String? {
         val url = "${baseUrl.trimEnd('/')}/v1/audio/speech"
         val body = JSONObject().apply {
@@ -74,7 +77,7 @@ object ApiClient {
     /**
      * AI 翻唱 - 使用 Chat Completions 生成翻唱建议
      */
-    suspend fun generateCover(baseUrl: String, apiKey: String, songName: String, lyrics: String, model: String = "gpt-4o-mini"): String? {
+    suspend fun generateCover(baseUrl: String, apiKey: String, songName: String, lyrics: String, model: String = "Qwen/Qwen3-8B"): String? {
         val url = "${baseUrl.trimEnd('/')}/v1/chat/completions"
         val body = JSONObject().apply {
             put("model", model)
@@ -107,25 +110,21 @@ object ApiClient {
     }
 
     /**
-     * 声音克隆 - Fish Speech 方式：
-     * 1. 上传参考音频获取 voice_id
-     * 2. 用 voice_id 进行 TTS 合成
-     * 
-     * 如果参考音频为空，则使用预设音色
+     * 声音克隆 - 上传参考音频 + 用该声音合成
+     * SiliconFlow 支持上传参考音频到 /v1/audio/voice
+     * 然后用返回的 voice ID 进行 TTS
      */
     suspend fun cloneVoice(
         baseUrl: String, apiKey: String, text: String,
-        referenceAudioPath: String? = null, model: String = "fish-speech-1.5"
+        referenceAudioPath: String? = null, model: String = DEFAULT_MODEL
     ): String? {
         val voiceId = if (!referenceAudioPath.isNullOrEmpty()) {
-            // 上传参考音频获取 voice ID
-            val uploadedId = uploadReferenceAudio(baseUrl, apiKey, referenceAudioPath)
+            val uploadedId = uploadReferenceAudio(baseUrl, apiKey, referenceAudioPath, model)
             uploadedId ?: return null
         } else {
-            "alex" // 默认音色
+            VOICE_PRESETS[0].voiceValue
         }
 
-        // 使用 voice ID 进行 TTS
         val url = "${baseUrl.trimEnd('/')}/v1/audio/speech"
         val body = JSONObject().apply {
             put("model", model)
@@ -151,10 +150,10 @@ object ApiClient {
     }
 
     /**
-     * 上传参考音频到 Fish Speech 服务器
-     * 返回 voice_id
+     * 上传参考音频到 SiliconFlow
+     * POST /v1/audio/voice
      */
-    private fun uploadReferenceAudio(baseUrl: String, apiKey: String, audioPath: String): String? {
+    private fun uploadReferenceAudio(baseUrl: String, apiKey: String, audioPath: String, model: String): String? {
         val url = "${baseUrl.trimEnd('/')}/v1/audio/voice"
         val audioFile = File(audioPath)
         if (!audioFile.exists()) return null
@@ -162,10 +161,11 @@ object ApiClient {
         val requestBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart(
-                "audio", audioFile.name,
+                "file", audioFile.name,
                 audioFile.asRequestBody("audio/wav".toMediaType())
             )
-            .addFormDataPart("name", "custom_voice_${System.currentTimeMillis()}")
+            .addFormDataPart("model", model)
+            .addFormDataPart("customName", "custom_voice")
             .build()
 
         val request = Request.Builder()
@@ -178,7 +178,8 @@ object ApiClient {
         if (response.isSuccessful) {
             val responseBody = response.body?.string()
             val json = JSONObject(responseBody)
-            return json.optString("id", json.optString("voice_id", null))
+            // SiliconFlow returns { "uri": "xxxx" }
+            return json.optString("uri", json.optString("id", json.optString("voice_id", null)))
         }
         return null
     }
@@ -186,7 +187,7 @@ object ApiClient {
     /**
      * 伴奏分离建议
      */
-    suspend fun separateTracks(baseUrl: String, apiKey: String, model: String = "gpt-4o-mini"): String? {
+    suspend fun separateTracks(baseUrl: String, apiKey: String, model: String = "Qwen/Qwen3-8B"): String? {
         val url = "${baseUrl.trimEnd('/')}/v1/chat/completions"
         val body = JSONObject().apply {
             put("model", model)
