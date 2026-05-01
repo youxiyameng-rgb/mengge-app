@@ -42,6 +42,15 @@ object ApiClient {
     }
 
     /**
+     * 清理API Token：去除隐藏Unicode字符、空白、换行
+     */
+    private fun cleanToken(token: String): String {
+        return token.trim().filter { ch ->
+            ch.code in 0x20..0x7E // 只保留标准ASCII可见字符
+        }
+    }
+
+    /**
      * AI 配音 - TTS 语音合成（SiliconFlow）
      */
     suspend fun synthesizeSpeech(
@@ -73,18 +82,8 @@ object ApiClient {
     }
 
     /**
-     * 清理API Token：去除隐藏Unicode字符、空白、换行
-     */
-    private fun cleanToken(token: String): String {
-        return token.trim().filter { ch ->
-            ch.code in 0x20..0x7E // 只保留标准ASCII可见字符
-        }
-    }
-
-    /**
      * AI 翻唱 - 使用 Replicate 进行声音转换
-     * 方案: 使用 RVC (Retrieval-based Voice Conversion)
-     * 输入: 原唱音频 + 目标声音参考音频
+     * 使用模型路由接口: /v1/models/{owner}/{name}/predictions (不需要版本号)
      */
     suspend fun generateCover(
         replicateToken: String,
@@ -92,13 +91,10 @@ object ApiClient {
         targetVoicePath: String
     ): String? {
         val token = cleanToken(replicateToken)
-        // Step 1: 上传两个音频文件
         val songDataUri = readFileAsBase64DataUri(songAudioPath) ?: return null
         val voiceDataUri = readFileAsBase64DataUri(targetVoicePath) ?: return null
 
-        // Step 2: 创建预测任务（使用模型名，不指定版本号）
         val createBody = JSONObject().apply {
-            put("model", "lucataco/so-vits-svc")
             put("input", JSONObject().apply {
                 put("audio", songDataUri)
                 put("vc_audio", voiceDataUri)
@@ -106,11 +102,13 @@ object ApiClient {
                 put("f0_up_key", 0)
                 put("protect", 0.33)
             })
-            put("webhook_completed", JSONObject.NULL)
+            put("stream", false)
         }
 
+        // 使用模型路由接口，不需要 version
+        val modelUrl = "https://api.replicate.com/v1/models/lucataco/so-vits-svc/predictions"
         val createRequest = Request.Builder()
-            .url("https://api.replicate.com/v1/predictions")
+            .url(modelUrl)
             .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
             .addHeader("Prefer", "wait=60")
@@ -126,7 +124,6 @@ object ApiClient {
         val status = createResult.optString("status", "")
         val predictionId = createResult.optString("id", "")
 
-        // 如果已经完成
         if (status == "succeeded") {
             return extractOutputAndSave(createResult, "cover_${System.currentTimeMillis()}.wav")
         }
@@ -134,12 +131,12 @@ object ApiClient {
             throw Exception("翻唱失败: ${createResult.optString("error", "unknown")}")
         }
 
-        // Step 3: 轮询等待完成
         return pollReplicateResult(token, predictionId, "cover_${System.currentTimeMillis()}.wav")
     }
 
     /**
      * 伴奏分离 - 使用 Replicate Demucs
+     * 使用模型路由接口: /v1/models/{owner}/{name}/predictions
      */
     suspend fun separateTracks(
         replicateToken: String,
@@ -149,15 +146,15 @@ object ApiClient {
         val audioDataUri = readFileAsBase64DataUri(songAudioPath) ?: return null
 
         val createBody = JSONObject().apply {
-            put("model", "nateraw/music-separation")
             put("input", JSONObject().apply {
                 put("audio", audioDataUri)
             })
-            put("webhook_completed", JSONObject.NULL)
+            put("stream", false)
         }
 
+        val modelUrl = "https://api.replicate.com/v1/models/nateraw/music-separation/predictions"
         val createRequest = Request.Builder()
-            .url("https://api.replicate.com/v1/predictions")
+            .url(modelUrl)
             .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
             .addHeader("Prefer", "wait=60")
@@ -223,9 +220,6 @@ object ApiClient {
 
     // ========== Replicate helpers ==========
 
-    /**
-     * 将本地音频文件读取为 data URI (base64)
-     */
     private fun readFileAsBase64DataUri(filePath: String): String? {
         val file = File(filePath)
         if (!file.exists()) return null
@@ -242,9 +236,6 @@ object ApiClient {
         return "data:$mimeType;base64,$base64"
     }
 
-    /**
-     * 提取 Replicate 输出并保存
-     */
     private fun extractOutputAndSave(json: JSONObject, fileName: String): String? {
         val output = json.opt("output") ?: return null
         val downloadUrl = when (output) {
@@ -255,9 +246,6 @@ object ApiClient {
         return if (downloadUrl != null) downloadAndSave(downloadUrl, fileName) else null
     }
 
-    /**
-     * 轮询 Replicate 预测状态
-     */
     private fun pollReplicateResult(token: String, predictionId: String, fileName: String): String? {
         for (i in 0..60) {
             Thread.sleep(5000)
@@ -276,7 +264,6 @@ object ApiClient {
                         throw Exception("Replicate任务失败: $error")
                     }
                     "canceled" -> throw Exception("Replicate任务被取消")
-                    // processing, starting -> 继续等待
                 }
             }
         }
