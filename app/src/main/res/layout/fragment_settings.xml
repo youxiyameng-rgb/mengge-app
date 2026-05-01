@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="16dp">
+
+    <!-- ====== 制作人信息 ====== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingTop="24dp"
+        android:paddingBottom="20dp">
+
+        <ImageView
+            android:id="@+id/img_avatar"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:src="@drawable/avatar"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_avatar_circle"
+            android:padding="4dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="萌哥"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginTop="10dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AI配音工坊 · 制作人"
+            android:textSize="13sp"
+            android:textColor="#999999"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#EEEEEE"
+        android:layout_marginBottom="16dp" />
+
+    <!-- ====== 功能介绍区域 ====== -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="📱 功能介绍" android:textSize="22sp" android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <!-- AI配音 -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="#F8F9FA"
+        android:padding="14dp" android:layout_marginBottom="10dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🗣️ AI 配音" android:textSize="16sp" android:textStyle="bold"
+            android:textColor="#6C63FF" android:layout_marginBottom="6dp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="输入任意文字，选择喜欢的音色，AI 会将文字转换为自然流畅的语音。支持多种语言和声线，适合制作配音、旁白、有声书等。"
+            android:textSize="13sp" android:textColor="#555555" android:lineSpacingMultiplier="1.3" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="💡 使用方法：首页点击「AI 配音」→ 输入文本 → 点击「生成配音」→ 自动保存到手机"
+            android:textSize="12sp" android:textColor="#888888" android:layout_marginTop="6dp"
+            android:lineSpacingMultiplier="1.2" />
+    </LinearLayout>
+
+    <!-- AI翻唱 -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="#FFF5F7"
+        android:padding="14dp" android:layout_marginBottom="10dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🎵 AI 翻唱" android:textSize="16sp" android:textStyle="bold"
+            android:textColor="#FF6584" android:layout_marginBottom="6dp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="输入歌曲名称和歌词，AI 会为你生成翻唱建议，包括编曲风格、音色推荐和节奏调整方案。帮你轻松实现音乐创作灵感。"
+            android:textSize="13sp" android:textColor="#555555" android:lineSpacingMultiplier="1.3" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="💡 使用方法：首页点击「AI 翻唱」→ 输入歌曲名和歌词 → 点击「生成翻唱」→ 获取 AI 翻唱方案"
+            android:textSize="12sp" android:textColor="#888888" android:layout_marginTop="6dp"
+            android:lineSpacingMultiplier="1.2" />
+    </LinearLayout>
+
+    <!-- 声音克隆 -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="#F0FFF4"
+        android:padding="14dp" android:layout_marginBottom="10dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🎭 声音克隆" android:textSize="16sp" android:textStyle="bold"
+            android:textColor="#43E97B" android:layout_marginBottom="6dp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="上传一段参考音频（建议 10-30 秒清晰人声），AI 会学习该声音特征，然后用这个声音朗读你输入的任意文本，实现声音复刻。"
+            android:textSize="13sp" android:textColor="#555555" android:lineSpacingMultiplier="1.3" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="💡 使用方法：首页点击「声音克隆」→ 上传参考音频 → 输入要合成的文本 → 点击「开始克隆合成」"
+            android:textSize="12sp" android:textColor="#888888" android:layout_marginTop="6dp"
+            android:lineSpacingMultiplier="1.2" />
+    </LinearLayout>
+
+    <!-- 伴奏分离 -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="#FFF8E8"
+        android:padding="14dp" android:layout_marginBottom="10dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🎶 伴奏分离" android:textSize="16sp" android:textStyle="bold"
+            android:textColor="#F7971E" android:layout_marginBottom="6dp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="上传一首完整的歌曲，AI 会智能将人声和伴奏分离开来。你可以单独获取纯伴奏用于翻唱练习，或提取人声进行音频编辑。"
+            android:textSize="13sp" android:textColor="#555555" android:lineSpacingMultiplier="1.3" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="💡 使用方法：首页点击「伴奏分离」→ 上传音频文件 → 点击「开始分离」→ 获取分离后的音轨"
+            android:textSize="12sp" android:textColor="#888888" android:layout_marginTop="6dp"
+            android:lineSpacingMultiplier="1.2" />
+    </LinearLayout>
+
+    <!-- ====== 分割线 ====== -->
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="#E0E0E0" android:layout_marginTop="8dp" android:layout_marginBottom="20dp" />
+
+    <!-- ====== 使用须知 ====== -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="📋 使用须知" android:textSize="22sp" android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="#F5F5FF"
+        android:padding="14dp" android:layout_marginBottom="20dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="1️⃣ 请先在下方「API 设置」中填写你的 API Key 和 Base URL\n\n2️⃣ 支持 OpenAI 兼容接口的平台均可使用\n\n3️⃣ 生成的音频文件保存在手机「下载/AIVoice」目录\n\n4️⃣ 建议在 Wi-Fi 环境下使用，避免消耗流量\n\n5️⃣ API 调用会产生费用，请关注你的 API 账户余额"
+            android:textSize="13sp" android:textColor="#555555" android:lineSpacingMultiplier="1.5" />
+    </LinearLayout>
+
+    <!-- ====== 分割线 ====== -->
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="#E0E0E0" android:layout_marginBottom="20dp" />
+
+    <!-- ====== API 设置区域 ====== -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="⚙️ API 设置" android:textSize="22sp" android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="填写你自己的 API Key 和 Base URL，支持 OpenAI 兼容接口"
+        android:textSize="13sp" android:textColor="#888888" android:layout_marginBottom="20dp" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/edit_api_key" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:hint="API Key"
+            android:inputType="textPassword" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/edit_base_url" android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Base URL (如 https://api.openai.com)"
+            android:inputType="textUri" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/edit_model" android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="模型名称 (如 gpt-4o-mini)" android:inputType="text" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <Button android:id="@+id/btn_save"
+        android:layout_width="match_parent" android:layout_height="50dp"
+        android:text="💾 保存设置" android:backgroundTint="#6C63FF" />
+
+    <!-- ====== 分割线 ====== -->
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="#E0E0E0" android:layout_marginTop="28dp" android:layout_marginBottom="20dp" />
+
+    <!-- ====== 图标更换区域 ====== -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="🎨 更换APP图标" android:textSize="22sp" android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="选择一个主题图标，切换后桌面图标会自动更换"
+        android:textSize="13sp" android:textColor="#888888" android:layout_marginBottom="16dp" />
+
+    <!-- 当前图标预览 -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center_horizontal" android:orientation="vertical"
+        android:layout_marginBottom="16dp">
+        <ImageView android:id="@+id/img_current_icon"
+            android:layout_width="72dp" android:layout_height="72dp"
+            android:scaleType="fitCenter" />
+        <TextView android:id="@+id/tv_current_icon_name"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="当前图标" android:textSize="13sp" android:textColor="#666666"
+            android:layout_marginTop="6dp" />
+    </LinearLayout>
+
+    <!-- 图标选择网格 -->
+    <GridLayout android:id="@+id/grid_icons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="5"
+        android:rowCount="1"
+        android:layout_marginBottom="12dp"
+        android:alignment_center="true" />
+
+    <TextView android:id="@+id/tv_icon_hint"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="点击图标即可切换，桌面图标将在几秒后自动更新"
+        android:textSize="12sp" android:textColor="#999999"
+        android:gravity="center" android:layout_marginTop="8dp" />
+
+    <!-- ====== 支持平台 ====== -->
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="#E0E0E0" android:layout_marginTop="24dp" android:layout_marginBottom="16dp" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="🌐 支持平台" android:textSize="18sp" android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="• OpenAI (api.openai.com)\n• Fish Audio (api.fish.audio)\n• 智谱 (open.bigmodel.cn)\n• 通义千问 (dashscope.aliyuncs.com)\n• 其他 OpenAI 兼容 API"
+        android:textSize="13sp" android:textColor="#666666" android:lineSpacingMultiplier="1.4" />
+
+    <!-- ====== 版本信息 ====== -->
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="\n萌哥 v1.0.0" android:textSize="12sp" android:textColor="#BBBBBB"
+        android:gravity="center" android:layout_marginTop="24dp" android:layout_marginBottom="16dp" />
+</LinearLayout>
+</ScrollView>

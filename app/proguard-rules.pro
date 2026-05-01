@@ -1,0 +1,4 @@
+-keep class com.aivoice.app.model.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn okhttp3.**

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="🎶 伴奏分离" android:textSize="22sp" android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <Button android:id="@+id/btn_upload"
+        android:layout_width="match_parent" android:layout_height="50dp"
+        android:text="📁 上传音频文件" android:backgroundTint="#F7971E"
+        android:layout_marginBottom="12dp" />
+
+    <Button android:id="@+id/btn_separate"
+        android:layout_width="match_parent" android:layout_height="50dp"
+        android:text="🎶 开始分离" android:backgroundTint="#F7971E"
+        android:layout_marginBottom="12dp" />
+
+    <ProgressBar android:id="@+id/progress_bar"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center" android:visibility="gone" />
+
+    <TextView android:id="@+id/tv_status"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textSize="14sp" android:layout_marginTop="8dp" />
+</LinearLayout>

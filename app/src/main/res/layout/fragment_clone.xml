@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp">
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="🎭 声音克隆" android:textSize="22sp" android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <Button android:id="@+id/btn_upload"
+        android:layout_width="match_parent" android:layout_height="50dp"
+        android:text="📁 上传参考音频" android:backgroundTint="#43E97B"
+        android:layout_marginBottom="12dp" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/edit_text" android:layout_width="match_parent"
+            android:layout_height="120dp" android:gravity="top"
+            android:hint="输入要合成的文本" android:inputType="textMultiLine" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <Button android:id="@+id/btn_clone"
+        android:layout_width="match_parent" android:layout_height="50dp"
+        android:text="🎭 开始克隆合成" android:backgroundTint="#43E97B"
+        android:layout_marginBottom="12dp" />
+
+    <ProgressBar android:id="@+id/progress_bar"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center" android:visibility="gone" />
+
+    <TextView android:id="@+id/tv_status"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textSize="14sp" android:layout_marginTop="8dp" />
+</LinearLayout>
