@@ -73,6 +73,15 @@ object ApiClient {
     }
 
     /**
+     * 清理API Token：去除隐藏Unicode字符、空白、换行
+     */
+    private fun cleanToken(token: String): String {
+        return token.trim().filter { ch ->
+            ch.code in 0x20..0x7E // 只保留标准ASCII可见字符
+        }
+    }
+
+    /**
      * AI 翻唱 - 使用 Replicate 进行声音转换
      * 方案: 使用 RVC (Retrieval-based Voice Conversion)
      * 输入: 原唱音频 + 目标声音参考音频
@@ -82,6 +91,7 @@ object ApiClient {
         songAudioPath: String,
         targetVoicePath: String
     ): String? {
+        val token = cleanToken(replicateToken)
         // Step 1: 上传两个音频文件
         val songDataUri = readFileAsBase64DataUri(songAudioPath) ?: return null
         val voiceDataUri = readFileAsBase64DataUri(targetVoicePath) ?: return null
@@ -101,9 +111,9 @@ object ApiClient {
 
         val createRequest = Request.Builder()
             .url("https://api.replicate.com/v1/predictions")
-            .addHeader("Authorization", "Bearer $replicateToken")
+            .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
-            .addHeader("Prefer", "wait=120")
+            .addHeader("Prefer", "wait=60")
             .post(createBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
@@ -125,7 +135,7 @@ object ApiClient {
         }
 
         // Step 3: 轮询等待完成
-        return pollReplicateResult(replicateToken, predictionId, "cover_${System.currentTimeMillis()}.wav")
+        return pollReplicateResult(token, predictionId, "cover_${System.currentTimeMillis()}.wav")
     }
 
     /**
@@ -135,6 +145,7 @@ object ApiClient {
         replicateToken: String,
         songAudioPath: String
     ): String? {
+        val token = cleanToken(replicateToken)
         val audioDataUri = readFileAsBase64DataUri(songAudioPath) ?: return null
 
         val createBody = JSONObject().apply {
@@ -147,9 +158,9 @@ object ApiClient {
 
         val createRequest = Request.Builder()
             .url("https://api.replicate.com/v1/predictions")
-            .addHeader("Authorization", "Bearer $replicateToken")
+            .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
-            .addHeader("Prefer", "wait=120")
+            .addHeader("Prefer", "wait=60")
             .post(createBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
@@ -169,7 +180,7 @@ object ApiClient {
             throw Exception("分离失败: ${createResult.optString("error", "unknown")}")
         }
 
-        return pollReplicateResult(replicateToken, predictionId, "vocals_${System.currentTimeMillis()}.wav")
+        return pollReplicateResult(token, predictionId, "vocals_${System.currentTimeMillis()}.wav")
     }
 
     /**
