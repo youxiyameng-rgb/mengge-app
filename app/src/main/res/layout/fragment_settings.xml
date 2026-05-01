@@ -210,7 +210,7 @@
         android:columnCount="5"
         android:rowCount="1"
         android:layout_marginBottom="12dp"
-        android:alignment_center="true" />
+        android:layout_gravity="center_horizontal" />
 
     <TextView android:id="@+id/tv_icon_hint"
         android:layout_width="match_parent" android:layout_height="wrap_content"
