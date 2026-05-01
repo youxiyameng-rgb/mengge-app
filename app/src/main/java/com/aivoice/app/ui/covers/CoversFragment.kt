@@ -115,12 +115,12 @@ class CoversFragment : Fragment() {
                     binding.layoutPlayback.visibility = View.VISIBLE
                     playAudio()
                 } else {
-                    binding.tvStatus.text = "❌ 翻唱失败，请检查 Replicate Token 是否正确"
+                    binding.tvStatus.text = "❌ 翻唱失败：返回结果为空"
                 }
             } catch (e: Exception) {
                 binding.progressBar.visibility = View.GONE
                 binding.btnGenerate.isEnabled = true
-                binding.tvStatus.text = "❌ 错误: ${e.message}"
+                binding.tvStatus.text = "❌ ${e.message}"
             }
         }
     }

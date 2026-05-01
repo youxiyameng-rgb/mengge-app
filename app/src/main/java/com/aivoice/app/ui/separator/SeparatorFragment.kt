@@ -89,12 +89,12 @@ class SeparatorFragment : Fragment() {
                     binding.layoutPlayback.visibility = View.VISIBLE
                     playAudio()
                 } else {
-                    binding.tvStatus.text = "❌ 分离失败，请检查 Replicate Token"
+                    binding.tvStatus.text = "❌ 分离失败：返回结果为空"
                 }
             } catch (e: Exception) {
                 binding.progressBar.visibility = View.GONE
                 binding.btnSeparate.isEnabled = true
-                binding.tvStatus.text = "❌ 错误: ${e.message}"
+                binding.tvStatus.text = "❌ ${e.message}"
             }
         }
     }

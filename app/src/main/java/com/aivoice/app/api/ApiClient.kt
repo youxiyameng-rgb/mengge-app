@@ -16,13 +16,12 @@ object ApiClient {
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(300, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(120, TimeUnit.SECONDS)
         .build()
 
     const val DEFAULT_BASE_URL = "https://api.siliconflow.cn"
     const val DEFAULT_MODEL = "fnlp/MOSS-TTSD-v0.5"
 
-    // SiliconFlow 预设音色
     val VOICE_PRESETS = listOf(
         VoicePreset("alex", "Alex (男声)", "fnlp/MOSS-TTSD-v0.5:alex"),
         VoicePreset("anna", "Anna (女声)", "fnlp/MOSS-TTSD-v0.5:anna"),
@@ -74,85 +73,107 @@ object ApiClient {
     }
 
     /**
-     * AI 翻唱 - 使用 Replicate RVC voice conversion
-     * 上传原唱音频 + 目标声音参考音频 → 输出翻唱音频
+     * AI 翻唱 - 使用 Replicate 进行声音转换
+     * 方案: 使用 RVC (Retrieval-based Voice Conversion)
+     * 输入: 原唱音频 + 目标声音参考音频
      */
     suspend fun generateCover(
         replicateToken: String,
         songAudioPath: String,
         targetVoicePath: String
     ): String? {
-        // Step 1: Upload song file to Replicate
-        val songUrl = uploadFileToReplicate(replicateToken, songAudioPath) ?: return null
-        // Step 2: Upload target voice file
-        val voiceUrl = uploadFileToReplicate(replicateToken, targetVoicePath) ?: return null
+        // Step 1: 上传两个音频文件
+        val songDataUri = readFileAsBase64DataUri(songAudioPath) ?: return null
+        val voiceDataUri = readFileAsBase64DataUri(targetVoicePath) ?: return null
 
-        // Step 3: Create prediction using RVC voice conversion model
+        // Step 2: 创建预测任务（使用模型名，不指定版本号）
         val createBody = JSONObject().apply {
-            put("version", "951a50b3a415d10643c75e0337b9b6d7c1a1b8f7e45d0f72c6c0c7b5b3b0a9f8")
+            put("model", "lucataco/so-vits-svc")
             put("input", JSONObject().apply {
-                put("song_input", songUrl)
-                put("voice_ref", voiceUrl)
+                put("audio", songDataUri)
+                put("vc_audio", voiceDataUri)
                 put("f0_method", "rmvpe")
+                put("f0_up_key", 0)
                 put("protect", 0.33)
             })
+            put("webhook_completed", JSONObject.NULL)
         }
 
         val createRequest = Request.Builder()
             .url("https://api.replicate.com/v1/predictions")
             .addHeader("Authorization", "Bearer $replicateToken")
             .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "wait=120")
             .post(createBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         val createResponse = client.newCall(createRequest).execute()
-        if (!createResponse.isSuccessful) return null
+        if (!createResponse.isSuccessful) {
+            val errorBody = createResponse.body?.string() ?: "unknown error"
+            throw Exception("Replicate API error (${createResponse.code}): $errorBody")
+        }
         val createResult = JSONObject(createResponse.body?.string() ?: return null)
-        val predictionId = createResult.getString("id")
+        val status = createResult.optString("status", "")
+        val predictionId = createResult.optString("id", "")
 
-        // Step 4: Poll for completion
+        // 如果已经完成
+        if (status == "succeeded") {
+            return extractOutputAndSave(createResult, "cover_${System.currentTimeMillis()}.wav")
+        }
+        if (status == "failed" || status == "canceled") {
+            throw Exception("翻唱失败: ${createResult.optString("error", "unknown")}")
+        }
+
+        // Step 3: 轮询等待完成
         return pollReplicateResult(replicateToken, predictionId, "cover_${System.currentTimeMillis()}.wav")
     }
 
     /**
-     * 伴奏分离 - 使用 Replicate Demucs model
-     * 上传歌曲音频 → 输出分离后的人声和伴奏
+     * 伴奏分离 - 使用 Replicate Demucs
      */
     suspend fun separateTracks(
         replicateToken: String,
         songAudioPath: String
     ): String? {
-        // Step 1: Upload song file
-        val songUrl = uploadFileToReplicate(replicateToken, songAudioPath) ?: return null
+        val audioDataUri = readFileAsBase64DataUri(songAudioPath) ?: return null
 
-        // Step 2: Create prediction using Demucs model
         val createBody = JSONObject().apply {
-            put("version", "0712bdbb26d1bc43c48aa0cdc0a9e2c2b8c2a0fe56a4e5cc1c0c1f2e3e5b0aa0")
+            put("model", "nateraw/music-separation")
             put("input", JSONObject().apply {
-                put("audio", songUrl)
-                put("model", "htdemucs")
-                put("stem", "vocals")
+                put("audio", audioDataUri)
             })
+            put("webhook_completed", JSONObject.NULL)
         }
 
         val createRequest = Request.Builder()
             .url("https://api.replicate.com/v1/predictions")
             .addHeader("Authorization", "Bearer $replicateToken")
             .addHeader("Content-Type", "application/json")
+            .addHeader("Prefer", "wait=120")
             .post(createBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         val createResponse = client.newCall(createRequest).execute()
-        if (!createResponse.isSuccessful) return null
+        if (!createResponse.isSuccessful) {
+            val errorBody = createResponse.body?.string() ?: "unknown error"
+            throw Exception("Replicate API error (${createResponse.code}): $errorBody")
+        }
         val createResult = JSONObject(createResponse.body?.string() ?: return null)
-        val predictionId = createResult.getString("id")
+        val status = createResult.optString("status", "")
+        val predictionId = createResult.optString("id", "")
 
-        // Step 3: Poll for completion
-        return pollReplicateResult(replicateToken, predictionId, "separated_${System.currentTimeMillis()}.wav")
+        if (status == "succeeded") {
+            return extractOutputAndSave(createResult, "vocals_${System.currentTimeMillis()}.wav")
+        }
+        if (status == "failed" || status == "canceled") {
+            throw Exception("分离失败: ${createResult.optString("error", "unknown")}")
+        }
+
+        return pollReplicateResult(replicateToken, predictionId, "vocals_${System.currentTimeMillis()}.wav")
     }
 
     /**
-     * 声音克隆 - 上传参考音频 + 用该声音合成（SiliconFlow）
+     * 声音克隆 - SiliconFlow
      */
     suspend fun cloneVoice(
         baseUrl: String, apiKey: String, text: String,
@@ -191,35 +212,41 @@ object ApiClient {
 
     // ========== Replicate helpers ==========
 
-    private fun uploadFileToReplicate(token: String, filePath: String): String? {
+    /**
+     * 将本地音频文件读取为 data URI (base64)
+     */
+    private fun readFileAsBase64DataUri(filePath: String): String? {
         val file = File(filePath)
         if (!file.exists()) return null
-
-        // Try direct file upload
-        val requestBody = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart(
-                "content", file.name,
-                file.asRequestBody("audio/wav".toMediaType())
-            )
-            .build()
-
-        val request = Request.Builder()
-            .url("https://api.replicate.com/v1/files")
-            .addHeader("Authorization", "Bearer $token")
-            .post(requestBody)
-            .build()
-
-        val response = client.newCall(request).execute()
-        if (response.isSuccessful) {
-            val json = JSONObject(response.body?.string() ?: return null)
-            val urlsObj = json.optJSONObject("urls")
-            return urlsObj?.optString("get", null)
-                ?: json.optString("url", null)
+        val bytes = file.readBytes()
+        val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        val mimeType = when {
+            filePath.endsWith(".mp3") -> "audio/mpeg"
+            filePath.endsWith(".wav") -> "audio/wav"
+            filePath.endsWith(".ogg") -> "audio/ogg"
+            filePath.endsWith(".flac") -> "audio/flac"
+            filePath.endsWith(".m4a") -> "audio/mp4"
+            else -> "audio/wav"
         }
-        return null
+        return "data:$mimeType;base64,$base64"
     }
 
+    /**
+     * 提取 Replicate 输出并保存
+     */
+    private fun extractOutputAndSave(json: JSONObject, fileName: String): String? {
+        val output = json.opt("output") ?: return null
+        val downloadUrl = when (output) {
+            is JSONArray -> output.optString(0, null)
+            is String -> if (output.startsWith("http")) output else null
+            else -> null
+        }
+        return if (downloadUrl != null) downloadAndSave(downloadUrl, fileName) else null
+    }
+
+    /**
+     * 轮询 Replicate 预测状态
+     */
     private fun pollReplicateResult(token: String, predictionId: String, fileName: String): String? {
         for (i in 0..60) {
             Thread.sleep(5000)
@@ -232,20 +259,17 @@ object ApiClient {
                 val json = JSONObject(response.body?.string() ?: continue)
                 val status = json.getString("status")
                 when (status) {
-                    "succeeded" -> {
-                        val output = json.get("output")
-                        val downloadUrl = when (output) {
-                            is JSONArray -> output.getString(0)
-                            is String -> output
-                            else -> return null
-                        }
-                        return downloadAndSave(downloadUrl, fileName)
+                    "succeeded" -> return extractOutputAndSave(json, fileName)
+                    "failed" -> {
+                        val error = json.optString("error", "unknown error")
+                        throw Exception("Replicate任务失败: $error")
                     }
-                    "failed", "canceled" -> return null
+                    "canceled" -> throw Exception("Replicate任务被取消")
+                    // processing, starting -> 继续等待
                 }
             }
         }
-        return null
+        throw Exception("等待超时（5分钟）")
     }
 
     private fun downloadAndSave(url: String, fileName: String): String? {
