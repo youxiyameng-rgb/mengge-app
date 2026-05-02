@@ -44,7 +44,7 @@
 
     <EditText android:id="@+id/et_custom_prompt"
         android:layout_width="match_parent" android:layout_height="80dp"
-        android:hint="输入自定义翻唱风格描述...&#10;例如: R&B version, smooth female vocal, groovy bass"
+        android:hint="输入自定义翻唱风格描述...&#10;例如: R&amp;B version, smooth female vocal, groovy bass"
         android:inputType="textMultiLine" android:textSize="13sp"
         android:gravity="top|start" android:padding="10dp"
         android:background="@android:drawable/edit_text"
