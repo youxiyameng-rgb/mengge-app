@@ -82,36 +82,81 @@ object ApiClient {
     }
 
     /**
-     * AI 翻唱 - 使用 Replicate 进行声音转换
-     * 使用模型路由接口: /v1/models/{owner}/{name}/predictions (不需要版本号)
+     * 上传本地文件到 Replicate，返回公开可访问的 URL
+     * POST https://api.replicate.com/v1/files
+     */
+    private fun uploadToReplicate(token: String, filePath: String): String {
+        val file = File(filePath)
+        if (!file.exists()) throw Exception("文件不存在: $filePath")
+
+        val mimeType = when {
+            filePath.endsWith(".mp3") -> "audio/mpeg"
+            filePath.endsWith(".wav") -> "audio/wav"
+            filePath.endsWith(".ogg") -> "audio/ogg"
+            filePath.endsWith(".flac") -> "audio/flac"
+            filePath.endsWith(".m4a") -> "audio/mp4"
+            else -> "audio/wav"
+        }
+
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "file", file.name,
+                file.asRequestBody(mimeType.toMediaType())
+            )
+            .build()
+
+        val request = Request.Builder()
+            .url("https://api.replicate.com/v1/files")
+            .addHeader("Authorization", "Bearer $token")
+            .post(requestBody)
+            .build()
+
+        val response = client.newCall(request).execute()
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: "unknown error"
+            throw Exception("文件上传失败 (${response.code}): $errorBody")
+        }
+
+        val json = JSONObject(response.body?.string() ?: throw Exception("上传响应为空"))
+        val getUrl = json.optJSONObject("urls")?.optString("get")
+            ?: throw Exception("上传成功但未返回URL: $json")
+        return getUrl
+    }
+
+    /**
+     * AI 翻唱 - 使用 MiniMax Music Cover（Replicate 官方模型）
+     * 模型: minimax/music-cover
+     * 输入: 歌曲URL + 风格描述文字
+     * 输出: 翻唱后的音频文件
      */
     suspend fun generateCover(
         replicateToken: String,
         songAudioPath: String,
-        targetVoicePath: String
+        stylePrompt: String
     ): String? {
         val token = cleanToken(replicateToken)
-        val songDataUri = readFileAsBase64DataUri(songAudioPath) ?: return null
-        val voiceDataUri = readFileAsBase64DataUri(targetVoicePath) ?: return null
 
+        // Step 1: 上传歌曲文件到 Replicate 获取公开 URL
+        val songUrl = uploadToReplicate(token, songAudioPath)
+
+        // Step 2: 调用 minimax/music-cover 模型
         val createBody = JSONObject().apply {
             put("input", JSONObject().apply {
-                put("audio", songDataUri)
-                put("vc_audio", voiceDataUri)
-                put("f0_method", "rmvpe")
-                put("f0_up_key", 0)
-                put("protect", 0.33)
+                put("audio_url", songUrl)
+                put("prompt", stylePrompt)
+                put("audio_format", "mp3")
+                put("sample_rate", 44100)
+                put("bitrate", 256000)
             })
-            put("stream", false)
         }
 
-        // 使用模型路由接口，不需要 version
-        val modelUrl = "https://api.replicate.com/v1/models/lucataco/so-vits-svc/predictions"
+        val modelUrl = "https://api.replicate.com/v1/models/minimax/music-cover/predictions"
         val createRequest = Request.Builder()
             .url(modelUrl)
             .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
-            .addHeader("Prefer", "wait=60")
+            .addHeader("Prefer", "wait=120")
             .post(createBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
@@ -125,46 +170,49 @@ object ApiClient {
         val predictionId = createResult.optString("id", "")
 
         if (status == "succeeded") {
-            return extractOutputAndSave(createResult, "cover_${System.currentTimeMillis()}.wav")
+            return extractOutputAndSave(createResult, "cover_${System.currentTimeMillis()}.mp3")
         }
         if (status == "failed" || status == "canceled") {
             throw Exception("翻唱失败: ${createResult.optString("error", "unknown")}")
         }
 
-        return pollReplicateResult(token, predictionId, "cover_${System.currentTimeMillis()}.wav")
+        // Step 3: 轮询等待结果
+        return pollReplicateResult(token, predictionId, "cover_${System.currentTimeMillis()}.mp3")
     }
 
     /**
-     * 伴奏分离 - 使用 Replicate Demucs
-     * 使用模型路由接口: /v1/models/{owner}/{name}/predictions
+     * 伴奏分离 - 使用 Replicate 音频分离模型
+     * 模型: james30/audio-separator
      */
     suspend fun separateTracks(
         replicateToken: String,
         songAudioPath: String
     ): String? {
         val token = cleanToken(replicateToken)
-        val audioDataUri = readFileAsBase64DataUri(songAudioPath) ?: return null
+
+        // 上传音频文件获取公开 URL
+        val audioUrl = uploadToReplicate(token, songAudioPath)
 
         val createBody = JSONObject().apply {
             put("input", JSONObject().apply {
-                put("audio", audioDataUri)
+                put("audio", audioUrl)
             })
-            put("stream", false)
         }
 
-        val modelUrl = "https://api.replicate.com/v1/models/nateraw/music-separation/predictions"
+        // 尝试 james30/audio-separator
+        val modelUrl = "https://api.replicate.com/v1/models/james30/audio-separator/predictions"
         val createRequest = Request.Builder()
             .url(modelUrl)
             .addHeader("Authorization", "Bearer $token")
             .addHeader("Content-Type", "application/json")
-            .addHeader("Prefer", "wait=60")
+            .addHeader("Prefer", "wait=120")
             .post(createBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         val createResponse = client.newCall(createRequest).execute()
         if (!createResponse.isSuccessful) {
             val errorBody = createResponse.body?.string() ?: "unknown error"
-            throw Exception("Replicate API error (${createResponse.code}): $errorBody")
+            throw Exception("Replicate API error (${createResponse.code}): $errorBody\n\n如伴奏分离模型不可用，请在 Replicate 上搜索 'vocal separation' 找到可用模型。")
         }
         val createResult = JSONObject(createResponse.body?.string() ?: return null)
         val status = createResult.optString("status", "")
@@ -219,22 +267,6 @@ object ApiClient {
     }
 
     // ========== Replicate helpers ==========
-
-    private fun readFileAsBase64DataUri(filePath: String): String? {
-        val file = File(filePath)
-        if (!file.exists()) return null
-        val bytes = file.readBytes()
-        val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-        val mimeType = when {
-            filePath.endsWith(".mp3") -> "audio/mpeg"
-            filePath.endsWith(".wav") -> "audio/wav"
-            filePath.endsWith(".ogg") -> "audio/ogg"
-            filePath.endsWith(".flac") -> "audio/flac"
-            filePath.endsWith(".m4a") -> "audio/mp4"
-            else -> "audio/wav"
-        }
-        return "data:$mimeType;base64,$base64"
-    }
 
     private fun extractOutputAndSave(json: JSONObject, fileName: String): String? {
         val output = json.opt("output") ?: return null
