@@ -11,9 +11,9 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.aivoice.app.api.ApiClient
@@ -27,12 +27,26 @@ import java.io.File
 class CoversFragment : Fragment() {
     private var _binding: FragmentCoversBinding? = null
     private val binding get() = _binding!!
+
     private var mediaPlayer: MediaPlayer? = null
     private var currentFilePath: String? = null
     private var songFilePath: String? = null
     private var selectedModel = "music-cover-free"
+
     private val handler = Handler(Looper.getMainLooper())
-    private var progressRunnable: Runnable? = null
+    private var isSeekBarTracking = false
+
+    // 进度更新 Runnable
+    private val progressRunnable = object : Runnable {
+        override fun run() {
+            val mp = mediaPlayer ?: return
+            if (mp.isPlaying && !isSeekBarTracking) {
+                binding.seekBarPlayback.progress = mp.currentPosition
+                binding.tvTimeCurrent.text = formatTime(mp.currentPosition)
+            }
+            handler.postDelayed(this, 300)
+        }
+    }
 
     private val stylePresets = listOf(
         "🎤 温柔女声" to "温柔甜美的女声翻唱，抒情流行风格，细腻情感",
@@ -81,15 +95,22 @@ class CoversFragment : Fragment() {
         binding.btnPlay.setOnClickListener { togglePlayPause() }
         binding.btnStop.setOnClickListener { stopPlayback() }
         binding.btnDownload.setOnClickListener { downloadCover() }
-        binding.seekBarPlayback.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+
+        binding.seekBarPlayback.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    mediaPlayer?.seekTo(progress)
-                    updateTimeDisplay(progress)
+                    binding.tvTimeCurrent.text = formatTime(progress)
                 }
             }
-            override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
-            override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
+            override fun onStartTrackingTouch(sb: SeekBar) {
+                isSeekBarTracking = true
+            }
+            override fun onStopTrackingTouch(sb: SeekBar) {
+                try {
+                    mediaPlayer?.seekTo(sb.progress)
+                } catch (_: Exception) {}
+                isSeekBarTracking = false
+            }
         })
 
         binding.layoutPlayback.visibility = View.GONE
@@ -132,6 +153,8 @@ class CoversFragment : Fragment() {
         }
     }
 
+    // ===== 翻唱 =====
+
     private fun generateCover() {
         val prefs = requireContext().getSharedPreferences("api_settings", Context.MODE_PRIVATE)
         val minimaxKey = prefs.getString("minimax_api_key", "") ?: ""
@@ -149,6 +172,9 @@ class CoversFragment : Fragment() {
             Toast.makeText(requireContext(), "风格描述至少10个字", Toast.LENGTH_SHORT).show()
             return
         }
+
+        // 先停止之前的播放
+        releaseMediaPlayer()
 
         val modelLabel = if (selectedModel == "music-cover-free") "免费版" else "付费版"
         binding.progressBar.visibility = View.VISIBLE
@@ -169,7 +195,7 @@ class CoversFragment : Fragment() {
                     binding.tvStatus.text = "✅ 翻唱完成！($modelLabel)"
                     showPlaybackControls()
                     showLyrics(result.lyrics)
-                    startAutoPlay()
+                    startPlayback()
                 } else {
                     binding.tvStatus.text = "❌ 翻唱失败：返回结果为空"
                 }
@@ -184,117 +210,131 @@ class CoversFragment : Fragment() {
         }
     }
 
-    private fun showPlaybackControls() {
-        binding.layoutPlayback.visibility = View.VISIBLE
-        binding.btnPlay.text = "⏸ 暂停"
-        binding.btnPlay.isEnabled = true
-        binding.btnStop.isEnabled = true
-        binding.btnDownload.isEnabled = true
-    }
+    // ===== 歌词 =====
 
     private fun showLyrics(lyrics: String?) {
         if (!lyrics.isNullOrEmpty()) {
             binding.layoutLyrics.visibility = View.VISIBLE
-            // 取前两行歌词显示
             val lines = lyrics.split("\n").filter { it.isNotBlank() }
             binding.tvLyricsLine1.text = if (lines.isNotEmpty()) "🎵 ${lines[0].trim()}" else ""
             binding.tvLyricsLine2.text = if (lines.size > 1) "🎵 ${lines[1].trim()}" else ""
         } else {
-            // API不返回歌词就不显示
             binding.layoutLyrics.visibility = View.GONE
         }
     }
 
-    private fun startAutoPlay() {
+    // ===== 播放控制 =====
+
+    private fun showPlaybackControls() {
+        binding.layoutPlayback.visibility = View.VISIBLE
+        binding.seekBarPlayback.progress = 0
+        binding.tvTimeCurrent.text = "0:00"
+        binding.tvTimeTotal.text = "0:00"
+        binding.btnPlay.text = "⏸ 暂停"
+    }
+
+    /** 创建并开始播放 */
+    private fun startPlayback() {
         val path = currentFilePath ?: return
         try {
-            mediaPlayer?.release()
+            releaseMediaPlayer()
+
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(path)
                 prepare()
                 start()
 
-                // 设置进度条
+                // 设置进度条范围
                 binding.seekBarPlayback.max = duration
                 binding.tvTimeTotal.text = formatTime(duration)
                 binding.tvTimeCurrent.text = "0:00"
                 binding.btnPlay.text = "⏸ 暂停"
 
                 setOnCompletionListener {
-                    binding.btnPlay.text = "▶️ 播放"
-                    stopProgressUpdate()
+                    // 播放完成 → 按钮变为"重播"
+                    binding.btnPlay.text = "🔄 重播"
+                    handler.removeCallbacks(progressRunnable)
                     binding.seekBarPlayback.progress = binding.seekBarPlayback.max
                     binding.tvTimeCurrent.text = formatTime(duration)
                 }
             }
-            startProgressUpdate()
+
+            // 启动进度更新
+            handler.post(progressRunnable)
         } catch (e: Exception) {
             Toast.makeText(requireContext(), "播放失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
+    /** 暂停/继续/重播 切换 */
     private fun togglePlayPause() {
-        val mp = mediaPlayer ?: return
-        if (mp.isPlaying) {
-            mp.pause()
-            binding.btnPlay.text = "▶️ 播放"
-            stopProgressUpdate()
-        } else {
-            mp.start()
-            binding.btnPlay.text = "⏸ 暂停"
-            startProgressUpdate()
+        val mp = mediaPlayer
+
+        // mediaPlayer 不存在或已播放完成 → 从头播放
+        if (mp == null || !mp.isPlaying && !isPaused()) {
+            startPlayback()
+            return
+        }
+
+        try {
+            if (mp.isPlaying) {
+                // 正在播放 → 暂停
+                mp.pause()
+                binding.btnPlay.text = "▶️ 继续"
+                handler.removeCallbacks(progressRunnable)
+            } else {
+                // 已暂停 → 继续
+                mp.start()
+                binding.btnPlay.text = "⏸ 暂停"
+                handler.post(progressRunnable)
+            }
+        } catch (e: Exception) {
+            // 出错了就重新播放
+            startPlayback()
         }
     }
 
-    private fun stopPlayback() {
-        mediaPlayer?.apply {
-            stop()
-            prepare()
-            seekTo(0)
+    /** 判断是否处于暂停状态（非播放、非播放完成） */
+    private fun isPaused(): Boolean {
+        val mp = mediaPlayer ?: return false
+        return try {
+            // 如果能获取到 duration 且 position < duration，说明是暂停
+            mp.currentPosition < mp.duration && mp.currentPosition > 0
+        } catch (_: Exception) {
+            false
         }
+    }
+
+    /** 停止播放 */
+    private fun stopPlayback() {
+        try {
+            mediaPlayer?.let {
+                if (it.isPlaying) it.stop()
+            }
+            releaseMediaPlayer()
+        } catch (_: Exception) {}
+
         binding.btnPlay.text = "▶️ 播放"
         binding.seekBarPlayback.progress = 0
         binding.tvTimeCurrent.text = "0:00"
-        stopProgressUpdate()
+        handler.removeCallbacks(progressRunnable)
     }
 
-    private fun startProgressUpdate() {
-        stopProgressUpdate()
-        progressRunnable = object : Runnable {
-            override fun run() {
-                mediaPlayer?.let {
-                    if (it.isPlaying) {
-                        binding.seekBarPlayback.progress = it.currentPosition
-                        updateTimeDisplay(it.currentPosition)
-                        handler.postDelayed(this, 500)
-                    }
-                }
-            }
-        }
-        handler.post(progressRunnable!!)
+    /** 释放 MediaPlayer */
+    private fun releaseMediaPlayer() {
+        handler.removeCallbacks(progressRunnable)
+        try {
+            mediaPlayer?.release()
+        } catch (_: Exception) {}
+        mediaPlayer = null
     }
 
-    private fun stopProgressUpdate() {
-        progressRunnable?.let { handler.removeCallbacks(it) }
-        progressRunnable = null
-    }
-
-    private fun updateTimeDisplay(currentMs: Int) {
-        binding.tvTimeCurrent.text = formatTime(currentMs)
-    }
-
-    private fun formatTime(ms: Int): String {
-        val totalSec = ms / 1000
-        val min = totalSec / 60
-        val sec = totalSec % 60
-        return "$min:${if (sec < 10) "0" else ""}$sec"
-    }
+    // ===== 下载 =====
 
     private fun downloadCover() {
         val path = currentFilePath ?: return
         try {
             val srcFile = File(path)
-            // 复制到公共下载目录
             val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(
                 android.os.Environment.DIRECTORY_DOWNLOADS
             )
@@ -315,6 +355,8 @@ class CoversFragment : Fragment() {
         }
     }
 
+    // ===== 工具 =====
+
     private fun copyUriToFile(uri: Uri, prefix: String): String? {
         return try {
             val input = requireContext().contentResolver.openInputStream(uri) ?: return null
@@ -327,10 +369,15 @@ class CoversFragment : Fragment() {
         }
     }
 
+    private fun formatTime(ms: Int): String {
+        val totalSec = ms / 1000
+        val min = totalSec / 60
+        val sec = totalSec % 60
+        return "$min:${if (sec < 10) "0" else ""}$sec"
+    }
+
     override fun onDestroyView() {
-        stopProgressUpdate()
-        mediaPlayer?.release()
-        mediaPlayer = null
+        releaseMediaPlayer()
         super.onDestroyView()
         _binding = null
     }
