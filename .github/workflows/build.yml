@@ -25,6 +25,16 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
+    - name: Generate keystore
+      run: |
+        keytool -genkeypair -v \
+          -keystore app/release-key.jks \
+          -keyalg RSA -keysize 2048 -validity 36500 \
+          -alias mengge \
+          -storepass mengge123 \
+          -keypass mengge123 \
+          -dname "CN=MengGe AI Voice, OU=Development, O=OmniMind, L=Shanghai, C=CN"
+
     - name: Build Release APK
       run: ./gradlew assembleRelease
 
