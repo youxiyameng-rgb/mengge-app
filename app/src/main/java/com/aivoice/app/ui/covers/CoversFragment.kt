@@ -131,7 +131,7 @@ class CoversFragment : Fragment() {
         binding.progressBar.visibility = View.VISIBLE
         binding.btnGenerate.isEnabled = false
         binding.layoutPlayback.visibility = View.GONE
-        binding.tvStatus.text = "⏳ 上传歌曲中... 翻唱需要几分钟，请耐心等待"
+        binding.tvStatus.text = "⏳ 上传歌曲中... 翻唱需要2-5分钟\n💡 网络不稳定时会自动重试，请耐心等待"
 
         lifecycleScope.launch {
             try {
@@ -151,7 +151,7 @@ class CoversFragment : Fragment() {
             } catch (e: Exception) {
                 binding.progressBar.visibility = View.GONE
                 binding.btnGenerate.isEnabled = true
-                binding.tvStatus.text = "❌ ${e.message}"
+                binding.tvStatus.text = "❌ ${e.message}\n\n💡 提示: 如果是网络问题，请稍后重试"
             }
         }
     }
