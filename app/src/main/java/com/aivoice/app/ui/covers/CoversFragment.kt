@@ -27,12 +27,15 @@ class CoversFragment : Fragment() {
     private var currentFilePath: String? = null
     private var songFilePath: String? = null
 
+    // 当前选中的模型
+    private var selectedModel = "music-cover-free"
+
     // 翻唱风格预设：显示名 → prompt内容
     private val stylePresets = listOf(
-        "🎤 温柔女声" to "温柔甜美的女声翻唱，抒情流行风格",
-        "🎸 摇滚男声" to "摇滚风格翻唱，力量感男声，电吉他伴奏",
-        "🎹 轻柔钢琴" to "钢琴伴奏为主的轻柔翻唱，简约编曲",
-        "🎷 爵士风情" to "爵士风格翻唱，即兴感，萨克斯元素",
+        "🎤 温柔女声" to "温柔甜美的女声翻唱，抒情流行风格，细腻情感",
+        "🎸 摇滚男声" to "摇滚风格翻唱，沙哑力量感男声，电吉他鼓点伴奏",
+        "🎹 轻柔钢琴" to "钢琴伴奏为主的轻柔翻唱，简约空灵编曲",
+        "🎷 爵士风情" to "爵士风格翻唱，即兴感，萨克斯和低音贝斯",
         "🎻 古风国潮" to "中国风翻唱，古筝和笛子元素，古风韵味",
         "🎧 电子舞曲" to "电子舞曲风格翻唱，合成器音色，节奏感强",
         "🪕 民谣弹唱" to "民谣吉他弹唱风格，清新自然，原声感",
@@ -65,6 +68,9 @@ class CoversFragment : Fragment() {
         // 生成风格快捷标签
         setupStyleChips()
 
+        // 模型选择
+        setupModelChips()
+
         binding.btnSelectSong.setOnClickListener {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -78,16 +84,36 @@ class CoversFragment : Fragment() {
         binding.layoutPlayback.visibility = View.GONE
     }
 
+    private fun setupModelChips() {
+        // 免费模型
+        binding.chipFreeModel.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                selectedModel = "music-cover-free"
+                binding.chipPaidModel.isChecked = false
+                binding.tvModelHint.text = "💡 免费模型，风格控制较弱但完全免费"
+            }
+        }
+        // 付费模型
+        binding.chipPaidModel.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                selectedModel = "music-cover"
+                binding.chipFreeModel.isChecked = false
+                binding.tvModelHint.text = "💡 付费模型，风格控制力强，需要充值 Token Plan"
+            }
+        }
+        // 默认选免费
+        binding.chipFreeModel.isChecked = true
+    }
+
     private fun setupStyleChips() {
         for ((index, pair) in stylePresets.withIndex()) {
             val (label, prompt) = pair
             val chip = Chip(requireContext()).apply {
                 text = label
                 isCheckable = true
-                isChecked = index == 0  // 默认选中第一个
+                isChecked = index == 0
                 setOnClickListener {
                     binding.etSongDesc.setText(prompt)
-                    // 取消其他chip的选中状态
                     for (i in 0 until binding.chipGroupStyles.childCount) {
                         (binding.chipGroupStyles.getChildAt(i) as? Chip)?.isChecked = (i == index)
                     }
@@ -116,21 +142,22 @@ class CoversFragment : Fragment() {
             return
         }
 
+        val modelLabel = if (selectedModel == "music-cover-free") "免费版" else "付费版"
         binding.progressBar.visibility = View.VISIBLE
         binding.btnGenerate.isEnabled = false
         binding.layoutPlayback.visibility = View.GONE
-        binding.tvStatus.text = "⏳ 翻唱处理中...\n📝 当前风格: $songDesc\n💡 处理需要1-5分钟，请耐心等待"
+        binding.tvStatus.text = "⏳ 翻唱处理中 ($modelLabel)...\n📝 风格: $songDesc\n💡 处理需要1-5分钟，请耐心等待"
 
         lifecycleScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
-                    ApiClient.generateCover(minimaxKey, songFilePath!!, songDesc)
+                    ApiClient.generateCover(minimaxKey, songFilePath!!, songDesc, selectedModel)
                 }
                 binding.progressBar.visibility = View.GONE
                 binding.btnGenerate.isEnabled = true
                 if (result != null) {
                     currentFilePath = result
-                    binding.tvStatus.text = "✅ 翻唱完成！\n🎤 风格: $songDesc"
+                    binding.tvStatus.text = "✅ 翻唱完成！($modelLabel)\n🎤 风格: $songDesc"
                     binding.layoutPlayback.visibility = View.VISIBLE
                     playAudio()
                 } else {
@@ -139,7 +166,10 @@ class CoversFragment : Fragment() {
             } catch (e: Exception) {
                 binding.progressBar.visibility = View.GONE
                 binding.btnGenerate.isEnabled = true
-                binding.tvStatus.text = "❌ ${e.message}\n\n💡 如果是API配置问题，请检查设置页的MiniMax API Key"
+                val hint = if (e.message?.contains("余额") == true || e.message?.contains("1008") == true) {
+                    "\n\n💡 提示: 付费模型需要充值 Token Plan，请到 platform.minimaxi.com 订阅"
+                } else ""
+                binding.tvStatus.text = "❌ ${e.message}$hint"
             }
         }
     }

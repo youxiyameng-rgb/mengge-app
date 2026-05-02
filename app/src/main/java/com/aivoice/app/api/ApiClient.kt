@@ -175,7 +175,8 @@ object ApiClient {
     suspend fun generateCover(
         minimaxApiKey: String,
         songAudioPath: String,
-        stylePrompt: String
+        stylePrompt: String,
+        model: String = "music-cover-free"
     ): String? {
         val apiKey = cleanToken(minimaxApiKey)
         if (apiKey.isEmpty()) throw Exception("MiniMax API Key 为空")
@@ -186,7 +187,7 @@ object ApiClient {
         // Step 2: 调用音乐翻唱 API（同步接口，直接返回结果）
         val result = executeWithRetry(taskName = "AI翻唱") {
             val body = JSONObject().apply {
-                put("model", "music-cover-free")  // 免费版翻唱模型
+                put("model", model)                  // 支持 music-cover-free 和 music-cover
                 put("prompt", stylePrompt)          // 目标风格描述（必填，10-300字符）
                 put("audio_base64", audioBase64)    // 参考音频 base64
                 put("output_format", "url")         // 返回 URL 而非 hex（方便下载）
