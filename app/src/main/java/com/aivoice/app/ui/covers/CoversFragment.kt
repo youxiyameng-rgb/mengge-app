@@ -193,9 +193,8 @@ class CoversFragment : Fragment() {
                 if (result != null) {
                     currentFilePath = result.audioPath
                     binding.tvStatus.text = "✅ 翻唱完成！($modelLabel)"
-                    showPlaybackControls()
+                    showPlaybackControls(result.audioPath)
                     showLyrics(result.lyrics)
-                    startPlayback()
                 } else {
                     binding.tvStatus.text = "❌ 翻唱失败：返回结果为空"
                 }
@@ -225,12 +224,25 @@ class CoversFragment : Fragment() {
 
     // ===== 播放控制 =====
 
-    private fun showPlaybackControls() {
+    private fun showPlaybackControls(path: String) {
+        // 只显示控件，不播放
         binding.layoutPlayback.visibility = View.VISIBLE
         binding.seekBarPlayback.progress = 0
         binding.tvTimeCurrent.text = "0:00"
-        binding.tvTimeTotal.text = "0:00"
-        binding.btnPlay.text = "⏸ 暂停"
+
+        // 先预加载获取时长，但不播放
+        try {
+            val mp = MediaPlayer()
+            mp.setDataSource(path)
+            mp.prepare()
+            binding.seekBarPlayback.max = mp.duration
+            binding.tvTimeTotal.text = formatTime(mp.duration)
+            mp.release()
+        } catch (_: Exception) {
+            binding.tvTimeTotal.text = "0:00"
+        }
+
+        binding.btnPlay.text = "▶️ 播放"
     }
 
     /** 创建并开始播放 */
