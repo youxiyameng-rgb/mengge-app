@@ -9,7 +9,6 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.aivoice.app.api.ApiClient
 import com.aivoice.app.databinding.FragmentSettingsBinding
-import com.aivoice.app.util.IconManager
 
 class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
@@ -28,9 +27,6 @@ class SettingsFragment : Fragment() {
             saveSettings()
             Toast.makeText(requireContext(), "✅ 设置已保存", Toast.LENGTH_SHORT).show()
         }
-
-        // 图标切换
-        IconManager.setupIconGrid(requireContext(), binding.gridIcons, binding.imgCurrentIcon, binding.tvCurrentIconName)
     }
 
     private fun loadSettings() {
