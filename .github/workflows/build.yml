@@ -29,14 +29,18 @@ jobs:
       run: |
         keytool -genkeypair -v \
           -keystore app/release-key.jks \
+          -storetype JKS \
           -keyalg RSA -keysize 2048 -validity 36500 \
           -alias mengge \
           -storepass mengge123 \
           -keypass mengge123 \
           -dname "CN=MengGe AI Voice, OU=Development, O=OmniMind, L=Shanghai, C=CN"
 
+    - name: Verify keystore
+      run: ls -la app/release-key.jks && keytool -list -keystore app/release-key.jks -storepass mengge123
+
     - name: Build Release APK
-      run: ./gradlew assembleRelease
+      run: ./gradlew assembleRelease --info 2>&1 | tail -50
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
