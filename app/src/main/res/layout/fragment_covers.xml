@@ -9,7 +9,7 @@
         android:layout_marginBottom="8dp" />
 
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="上传歌曲 → 描述想要的风格 → AI 用新声音重新演绎"
+        android:text="选择歌曲 → 选择翻唱风格 → AI 用新声音重新演绎"
         android:textSize="13sp" android:textColor="#888888" android:layout_marginBottom="16dp" />
 
     <!-- 选择原唱歌曲 -->
@@ -27,18 +27,24 @@
         android:text="未选择文件" android:textSize="12sp" android:textColor="#999999"
         android:layout_marginBottom="16dp" />
 
-    <!-- 歌曲风格描述 -->
+    <!-- 翻唱风格选择 -->
     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:text="📝 风格描述" android:textSize="16sp" android:textStyle="bold"
-        android:layout_marginBottom="6dp" />
+        android:text="🎨 翻唱风格" android:textSize="16sp" android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
 
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="描述你想要的翻唱效果（中文或英文均可，10-300字）"
+        android:text="选择预设风格，或在下方自定义描述（至少10字）"
         android:textSize="12sp" android:textColor="#888888" android:layout_marginBottom="6dp" />
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chip_group_styles"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp" />
 
     <EditText android:id="@+id/et_song_desc"
         android:layout_width="match_parent" android:layout_height="80dp"
-        android:hint="例如: 用温柔女声重新演绎，轻快流行风格&#10;或: sweet female vocal, pop arrangement"
+        android:hint="自定义风格描述（中文或英文均可）"
         android:inputType="textMultiLine" android:textSize="13sp"
         android:gravity="top|start" android:padding="10dp"
         android:background="@android:drawable/edit_text"

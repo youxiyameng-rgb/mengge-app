@@ -14,6 +14,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.aivoice.app.api.ApiClient
 import com.aivoice.app.databinding.FragmentCoversBinding
+import com.google.android.material.chip.Chip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -25,6 +26,18 @@ class CoversFragment : Fragment() {
     private var mediaPlayer: MediaPlayer? = null
     private var currentFilePath: String? = null
     private var songFilePath: String? = null
+
+    // 翻唱风格预设：显示名 → prompt内容
+    private val stylePresets = listOf(
+        "🎤 温柔女声" to "温柔甜美的女声翻唱，抒情流行风格",
+        "🎸 摇滚男声" to "摇滚风格翻唱，力量感男声，电吉他伴奏",
+        "🎹 轻柔钢琴" to "钢琴伴奏为主的轻柔翻唱，简约编曲",
+        "🎷 爵士风情" to "爵士风格翻唱，即兴感，萨克斯元素",
+        "🎻 古风国潮" to "中国风翻唱，古筝和笛子元素，古风韵味",
+        "🎧 电子舞曲" to "电子舞曲风格翻唱，合成器音色，节奏感强",
+        "🪕 民谣弹唱" to "民谣吉他弹唱风格，清新自然，原声感",
+        "🎻 交响史诗" to "交响乐编曲翻唱，气势磅礴，管弦乐配器"
+    )
 
     private val songPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -46,8 +59,11 @@ class CoversFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 默认提示词
-        binding.etSongDesc.setText("a pop song with vocals")
+        // 默认选中第一个风格
+        binding.etSongDesc.setText(stylePresets[0].second)
+
+        // 生成风格快捷标签
+        setupStyleChips()
 
         binding.btnSelectSong.setOnClickListener {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -60,6 +76,25 @@ class CoversFragment : Fragment() {
         binding.btnGenerate.setOnClickListener { generateCover() }
         binding.btnPlay.setOnClickListener { playAudio() }
         binding.layoutPlayback.visibility = View.GONE
+    }
+
+    private fun setupStyleChips() {
+        for ((index, pair) in stylePresets.withIndex()) {
+            val (label, prompt) = pair
+            val chip = Chip(requireContext()).apply {
+                text = label
+                isCheckable = true
+                isChecked = index == 0  // 默认选中第一个
+                setOnClickListener {
+                    binding.etSongDesc.setText(prompt)
+                    // 取消其他chip的选中状态
+                    for (i in 0 until binding.chipGroupStyles.childCount) {
+                        (binding.chipGroupStyles.getChildAt(i) as? Chip)?.isChecked = (i == index)
+                    }
+                }
+            }
+            binding.chipGroupStyles.addView(chip)
+        }
     }
 
     private fun generateCover() {
@@ -76,15 +111,15 @@ class CoversFragment : Fragment() {
         }
 
         val songDesc = binding.etSongDesc.text.toString().trim()
-        if (songDesc.isEmpty()) {
-            Toast.makeText(requireContext(), "请填写歌曲风格描述", Toast.LENGTH_SHORT).show()
+        if (songDesc.length < 10) {
+            Toast.makeText(requireContext(), "风格描述至少10个字，请从标签选择或自行填写", Toast.LENGTH_SHORT).show()
             return
         }
 
         binding.progressBar.visibility = View.VISIBLE
         binding.btnGenerate.isEnabled = false
         binding.layoutPlayback.visibility = View.GONE
-        binding.tvStatus.text = "⏳ 翻唱处理中...\n💡 海螺音乐是国内服务器，速度快且稳定\n💡 处理需要1-5分钟，请耐心等待"
+        binding.tvStatus.text = "⏳ 翻唱处理中...\n📝 当前风格: $songDesc\n💡 处理需要1-5分钟，请耐心等待"
 
         lifecycleScope.launch {
             try {
@@ -95,7 +130,7 @@ class CoversFragment : Fragment() {
                 binding.btnGenerate.isEnabled = true
                 if (result != null) {
                     currentFilePath = result
-                    binding.tvStatus.text = "✅ 翻唱完成！"
+                    binding.tvStatus.text = "✅ 翻唱完成！\n🎤 风格: $songDesc"
                     binding.layoutPlayback.visibility = View.VISIBLE
                     playAudio()
                 } else {
