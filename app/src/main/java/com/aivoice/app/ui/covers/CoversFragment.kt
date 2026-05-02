@@ -31,23 +31,23 @@ class CoversFragment : Fragment() {
         "🎤 选择翻唱风格...",
         "🎵 流行女声版 - 温柔甜美女声，流行编曲，轻快节奏",
         "🎸 摇滚版 - 激烈电吉他，强力鼓点，嘶吼男声",
-        "🎷 爵士版 - 萨克斯主奏，柔和女声，爵士钢琴和弦，深夜酒吧氛围",
+        "🎷 爵士版 - 萨克斯主奏，柔和女声，爵士钢琴和弦",
         "🎹 钢琴抒情版 - 钢琴伴奏，深情男声，简约编曲",
         "🎻 古风版 - 古筝琵琶，悠扬女声，中国风编曲",
-        "🎧 电子EDM版 - 电子合成器，128BPM，合成贝斯，动感节拍",
-        "🌊 Lo-fi版 - Lo-fi嘻哈，黑胶噪声，慵懒节拍，温暖中频",
-        "🎻 民谣吉他版 - 指弹吉他，温暖男声，亲密录音室感觉",
+        "🎧 电子EDM版 - 电子合成器，128BPM，动感节拍",
+        "🌊 Lo-fi版 - 黑胶噪声，慵懒节拍，温暖中频",
+        "🎻 民谣吉他版 - 指弹吉他，温暖男声，亲密录音室",
         "🤘 说唱版 - 说唱flow，808贝斯，trap节拍",
         "✨ 自定义 (在下方输入)")
     private val stylePrompts = listOf(
         "",
         "Pop version, sweet female vocal, catchy melody, light upbeat arrangement",
         "Hard rock, electric guitar riffs, powerful drums, intense male vocal",
-        "Jazz arrangement, saxophone lead, smooth female vocal, mellow piano chords, late night club",
+        "Jazz arrangement, saxophone lead, smooth female vocal, mellow piano chords",
         "Piano ballad, emotional male vocal, minimal arrangement, intimate feel",
-        "Traditional Chinese style, guzheng and pipa, ethereal female vocal, oriental arrangement",
+        "Traditional Chinese style, guzheng and pipa, ethereal female vocal",
         "EDM remix, 128 BPM, synth bass, atmospheric pads, driving beat",
-        "Lo-fi hip hop version, vinyl crackle, chill beat, warm midrange, laid back vocal",
+        "Lo-fi hip hop version, vinyl crackle, chill beat, warm midrange",
         "Acoustic folk, fingerpicked guitar, warm male vocal, intimate studio feel",
         "Rap version, trap beat, 808 bass, flow delivery",
         "")
@@ -72,19 +72,13 @@ class CoversFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 设置风格预设下拉
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, stylePresets)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.spinnerStyle.adapter = adapter
-        binding.spinnerStyle.setSelection(1) // 默认选中流行女声
+        binding.spinnerStyle.setSelection(1)
         binding.spinnerStyle.setOnItemSelectedListener(object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (position == stylePresets.size - 1) {
-                    // 自定义：显示输入框
-                    binding.etCustomPrompt.visibility = View.VISIBLE
-                } else {
-                    binding.etCustomPrompt.visibility = View.GONE
-                }
+                binding.etCustomPrompt.visibility = if (position == stylePresets.size - 1) View.VISIBLE else View.GONE
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         })
@@ -104,10 +98,10 @@ class CoversFragment : Fragment() {
 
     private fun generateCover() {
         val prefs = requireContext().getSharedPreferences("api_settings", Context.MODE_PRIVATE)
-        val replicateToken = prefs.getString("replicate_token", "") ?: ""
+        val minimaxKey = prefs.getString("minimax_api_key", "") ?: ""
 
-        if (replicateToken.isEmpty()) {
-            Toast.makeText(requireContext(), "请先在设置中配置 Replicate Token", Toast.LENGTH_SHORT).show()
+        if (minimaxKey.isEmpty()) {
+            Toast.makeText(requireContext(), "请先在设置中配置 MiniMax API Key", Toast.LENGTH_LONG).show()
             return
         }
         if (songFilePath == null) {
@@ -117,7 +111,6 @@ class CoversFragment : Fragment() {
 
         val spinnerPos = binding.spinnerStyle.selectedItemPosition
         val stylePrompt = if (spinnerPos == stylePresets.size - 1) {
-            // 自定义风格
             binding.etCustomPrompt.text.toString().trim()
         } else {
             stylePrompts[spinnerPos]
@@ -131,12 +124,12 @@ class CoversFragment : Fragment() {
         binding.progressBar.visibility = View.VISIBLE
         binding.btnGenerate.isEnabled = false
         binding.layoutPlayback.visibility = View.GONE
-        binding.tvStatus.text = "⏳ 上传歌曲中... 翻唱需要2-5分钟\n💡 网络不稳定时会自动重试，请耐心等待"
+        binding.tvStatus.text = "⏳ 翻唱处理中...\n💡 海螺音乐是国内服务器，速度快且稳定\n💡 大文件处理需要1-5分钟，请耐心等待"
 
         lifecycleScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
-                    ApiClient.generateCover(replicateToken, songFilePath!!, stylePrompt)
+                    ApiClient.generateCover(minimaxKey, songFilePath!!, stylePrompt)
                 }
                 binding.progressBar.visibility = View.GONE
                 binding.btnGenerate.isEnabled = true
@@ -151,7 +144,7 @@ class CoversFragment : Fragment() {
             } catch (e: Exception) {
                 binding.progressBar.visibility = View.GONE
                 binding.btnGenerate.isEnabled = true
-                binding.tvStatus.text = "❌ ${e.message}\n\n💡 提示: 如果是网络问题，请稍后重试"
+                binding.tvStatus.text = "❌ ${e.message}\n\n💡 如果是API配置问题，请检查设置页的MiniMax API Key"
             }
         }
     }

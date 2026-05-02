@@ -30,6 +30,9 @@ object ApiClient {
     const val DEFAULT_BASE_URL = "https://api.siliconflow.cn"
     const val DEFAULT_MODEL = "fnlp/MOSS-TTSD-v0.5"
 
+    // MiniMax API 基础地址（国内直连，无需翻墙）
+    const val MINIMAX_BASE_URL = "https://api.minimax.chat"
+
     val VOICE_PRESETS = listOf(
         VoicePreset("alex", "Alex (男声)", "fnlp/MOSS-TTSD-v0.5:alex"),
         VoicePreset("anna", "Anna (女声)", "fnlp/MOSS-TTSD-v0.5:anna"),
@@ -53,9 +56,6 @@ object ApiClient {
         return token.trim().filter { ch -> ch.code in 0x20..0x7E }
     }
 
-    /**
-     * 判断是否为网络可重试的异常
-     */
     private fun isNetworkRetryable(e: Exception): Boolean {
         return e is SocketException
             || e is SocketTimeoutException
@@ -67,9 +67,6 @@ object ApiClient {
                 || e.message?.contains("connect", true) == true)
     }
 
-    /**
-     * 带重试的网络请求包装器
-     */
     private fun <T> executeWithRetry(
         maxRetries: Int = 3,
         taskName: String = "请求",
@@ -82,19 +79,15 @@ object ApiClient {
             } catch (e: Exception) {
                 lastException = e
                 if (isNetworkRetryable(e) && attempt < maxRetries) {
-                    val delay = attempt * 3000L // 3s, 6s, 9s
-                    Thread.sleep(delay)
+                    Thread.sleep(attempt * 3000L)
                     continue
                 }
-                // 非网络错误或最后一次重试，直接抛出
                 if (isNetworkRetryable(e)) {
                     throw Exception(
                         "网络连接不稳定（已重试${maxRetries}次）。\n" +
                         "建议：\n" +
                         "1. 检查网络连接，建议使用 WiFi\n" +
-                        "2. 如果使用移动数据，尝试切换到其他网络\n" +
-                        "3. Replicate 服务器在国内访问可能不稳定，稍后重试\n" +
-                        "4. 如有条件，可使用网络代理\n\n" +
+                        "2. 如果使用移动数据，尝试切换到其他网络\n\n" +
                         "原始错误: ${e.javaClass.simpleName}: ${e.message}"
                     )
                 }
@@ -104,9 +97,8 @@ object ApiClient {
         throw lastException ?: Exception("$taskName 失败")
     }
 
-    /**
-     * AI 配音 - TTS 语音合成（SiliconFlow）
-     */
+    // ===== AI 配音 - SiliconFlow TTS =====
+
     suspend fun synthesizeSpeech(
         baseUrl: String, apiKey: String, text: String,
         model: String = DEFAULT_MODEL, voice: String = VOICE_PRESETS[0].voiceValue
@@ -138,152 +130,192 @@ object ApiClient {
         }
     }
 
+    // ===== AI 翻唱 - MiniMax 海螺音乐（国内直连）=====
+
     /**
-     * 上传本地文件到 Replicate（带重试）
+     * 文件转 base64 字符串
      */
-    private fun uploadToReplicate(token: String, filePath: String): String {
+    private fun fileToBase64(filePath: String): String {
         val file = File(filePath)
         if (!file.exists()) throw Exception("文件不存在: $filePath")
-
-        val mimeType = when {
-            filePath.endsWith(".mp3") -> "audio/mpeg"
-            filePath.endsWith(".wav") -> "audio/wav"
-            filePath.endsWith(".ogg") -> "audio/ogg"
-            filePath.endsWith(".flac") -> "audio/flac"
-            filePath.endsWith(".m4a") -> "audio/mp4"
-            filePath.endsWith(".aac") -> "audio/aac"
-            else -> "audio/wav"
-        }
-
-        return executeWithRetry(taskName = "文件上传") {
-            val requestBody = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart(
-                    "file", file.name,
-                    file.asRequestBody(mimeType.toMediaType())
-                )
-                .build()
-
-            val request = Request.Builder()
-                .url("https://api.replicate.com/v1/files")
-                .addHeader("Authorization", "Bearer $token")
-                .post(requestBody)
-                .build()
-
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: "unknown error"
-                throw Exception("文件上传失败 (${response.code}): $errorBody")
-            }
-
-            val json = JSONObject(response.body?.string() ?: throw Exception("上传响应为空"))
-            json.optJSONObject("urls")?.optString("get")
-                ?: throw Exception("上传成功但未返回URL: $json")
-        }
+        val bytes = file.readBytes()
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
     }
 
     /**
-     * 创建 Replicate prediction（带重试）
+     * AI 翻唱 - MiniMax Music Cover API
+     *
+     * 流程：
+     * 1. 将音频文件编码为 base64
+     * 2. 调用 MiniMax 创建翻唱任务
+     * 3. 轮询等待结果
+     * 4. 下载并保存结果音频
      */
-    private fun createReplicatePrediction(token: String, modelPath: String, inputBody: JSONObject): JSONObject {
-        return executeWithRetry(taskName = "创建任务") {
+    suspend fun generateCover(
+        minimaxApiKey: String,
+        songAudioPath: String,
+        stylePrompt: String
+    ): String? {
+        val apiKey = cleanToken(minimaxApiKey)
+        if (apiKey.isEmpty()) throw Exception("MiniMax API Key 为空")
+
+        // Step 1: 编码音频文件
+        val audioBase64 = fileToBase64(songAudioPath)
+        val mimeType = when {
+            songAudioPath.endsWith(".mp3") -> "audio/mpeg"
+            songAudioPath.endsWith(".wav") -> "audio/wav"
+            songAudioPath.endsWith(".ogg") -> "audio/ogg"
+            songAudioPath.endsWith(".flac") -> "audio/flac"
+            songAudioPath.endsWith(".m4a") -> "audio/mp4"
+            else -> "audio/wav"
+        }
+        val dataUri = "data:$mimeType;base64,$audioBase64"
+
+        // Step 2: 创建翻唱任务
+        val createResult = executeWithRetry(taskName = "创建翻唱任务") {
             val body = JSONObject().apply {
-                put("input", inputBody)
+                put("model", "music-2.0")
+                put("refer_audio_url", dataUri)
+                put("refer_audio_format", "mp3")
+                put("refer_audio_sample_rate", 44100)
+                put("refer_audio_bitrate", 128000)
             }
 
             val request = Request.Builder()
-                .url("https://api.replicate.com/v1/models/$modelPath/predictions")
-                .addHeader("Authorization", "Bearer $token")
+                .url("$MINIMAX_BASE_URL/v1/music/cover")
+                .addHeader("Authorization", "Bearer $apiKey")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("Prefer", "wait=120")
                 .post(body.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
             val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: "{}"
             if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: "unknown error"
-                throw Exception("Replicate API error (${response.code}): $errorBody")
+                throw Exception("MiniMax API错误 (${response.code}): $responseBody")
             }
-            JSONObject(response.body?.string() ?: throw Exception("响应为空"))
+            JSONObject(responseBody)
         }
+
+        // 检查创建状态
+        val baseResp = createResult.optJSONObject("base_resp")
+        if (baseResp != null && baseResp.optInt("status_code", 0) != 0) {
+            throw Exception("MiniMax错误: ${baseResp.optString("status_msg", "unknown")}")
+        }
+
+        val taskId = createResult.optString("task_id", "")
+        if (taskId.isEmpty()) {
+            throw Exception("MiniMax未返回task_id: $createResult")
+        }
+
+        // Step 3: 轮询等待结果
+        return pollMiniMaxResult(apiKey, taskId)
     }
 
     /**
-     * AI 翻唱 - MiniMax Music Cover
+     * 轮询 MiniMax 翻唱任务结果
      */
-    suspend fun generateCover(
-        replicateToken: String,
-        songAudioPath: String,
-        stylePrompt: String
-    ): String? {
-        val token = cleanToken(replicateToken)
+    private fun pollMiniMaxResult(apiKey: String, taskId: String): String? {
+        for (i in 0..120) {  // 最多等 10 分钟
+            Thread.sleep(5000)
 
-        // Step 1: 上传歌曲
-        val songUrl = uploadToReplicate(token, songAudioPath)
+            val result = executeWithRetry(maxRetries = 3, taskName = "查询翻唱结果") {
+                val request = Request.Builder()
+                    .url("$MINIMAX_BASE_URL/v1/music/cover/query?task_id=$taskId")
+                    .addHeader("Authorization", "Bearer $apiKey")
+                    .get()
+                    .build()
 
-        // Step 2: 创建翻唱任务
-        val input = JSONObject().apply {
-            put("audio_url", songUrl)
-            put("prompt", stylePrompt)
-            put("audio_format", "mp3")
-            put("sample_rate", 44100)
-            put("bitrate", 256000)
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string() ?: "{}"
+                if (!response.isSuccessful) {
+                    throw IOException("查询失败 (${response.code}): $responseBody")
+                }
+                JSONObject(responseBody)
+            }
+
+            // 检查 base_resp
+            val baseResp = result.optJSONObject("base_resp")
+            if (baseResp != null && baseResp.optInt("status_code", 0) != 0) {
+                val errMsg = baseResp.optString("status_msg", "unknown")
+                throw Exception("翻唱任务失败: $errMsg")
+            }
+
+            val status = result.optString("status", "")
+            when (status) {
+                "completed", "done", "succeeded" -> {
+                    // 从结果中提取音频并保存
+                    return extractMiniMaxAudio(result)
+                }
+                "failed", "error", "canceled" -> {
+                    throw Exception("翻唱任务失败: ${result.optString("error", status)}")
+                }
+                // "processing", "pending", "running" → 继续轮询
+            }
+
+            // 也检查 file 字段（有些版本直接返回 file）
+            if (result.has("audio_file") || result.has("file") || result.has("audio_data")) {
+                return extractMiniMaxAudio(result)
+            }
         }
-
-        val createResult = createReplicatePrediction(token, "minimax/music-cover", input)
-        val status = createResult.optString("status", "")
-        val predictionId = createResult.optString("id", "")
-
-        if (status == "succeeded") {
-            return extractOutputAndSave(createResult, "cover_${System.currentTimeMillis()}.mp3")
-        }
-        if (status == "failed" || status == "canceled") {
-            throw Exception("翻唱失败: ${createResult.optString("error", "unknown")}")
-        }
-
-        // Step 3: 轮询等待
-        return pollReplicateResult(token, predictionId, "cover_${System.currentTimeMillis()}.mp3")
+        throw Exception("翻唱超时（10分钟），请稍后重试")
     }
 
     /**
-     * 伴奏分离
+     * 从 MiniMax 响应中提取音频数据并保存
      */
+    private fun extractMiniMaxAudio(json: JSONObject): String? {
+        // 尝试多种可能的字段名
+        val audioData = json.optString("audio_file", null)
+            ?: json.optString("audio_data", null)
+            ?: json.optJSONObject("file")?.optString("data", null)
+            ?: json.optJSONObject("audio")?.optString("data", null)
+
+        if (audioData != null && audioData.isNotEmpty()) {
+            // base64 编码的音频数据
+            val bytes = android.util.Base64.decode(audioData, android.util.Base64.DEFAULT)
+            val file = File(getDownloadDir(), "cover_${System.currentTimeMillis()}.mp3")
+            FileOutputStream(file).use { it.write(bytes) }
+            return file.absolutePath
+        }
+
+        // 尝试获取 URL
+        val audioUrl = json.optString("audio_url", null)
+            ?: json.optString("audio_file_url", null)
+            ?: json.optJSONObject("file")?.optString("url", null)
+            ?: json.optJSONObject("audio")?.optString("url", null)
+
+        if (audioUrl != null && audioUrl.startsWith("http")) {
+            return downloadAndSave(audioUrl, "cover_${System.currentTimeMillis()}.mp3")
+        }
+
+        throw Exception("翻唱完成但无法提取音频: $json")
+    }
+
+    // ===== 伴奏分离（暂用提示告知用户手动处理）=====
+
     suspend fun separateTracks(
-        replicateToken: String,
+        apiKey: String,
         songAudioPath: String
     ): String? {
-        val token = cleanToken(replicateToken)
-
-        val audioUrl = uploadToReplicate(token, songAudioPath)
-
-        val input = JSONObject().apply {
-            put("audio", audioUrl)
-        }
-
-        val createResult = createReplicatePrediction(token, "james30/audio-separator", input)
-        val status = createResult.optString("status", "")
-        val predictionId = createResult.optString("id", "")
-
-        if (status == "succeeded") {
-            return extractOutputAndSave(createResult, "vocals_${System.currentTimeMillis()}.wav")
-        }
-        if (status == "failed" || status == "canceled") {
-            throw Exception("分离失败: ${createResult.optString("error", "unknown")}")
-        }
-
-        return pollReplicateResult(token, predictionId, "vocals_${System.currentTimeMillis()}.wav")
+        throw Exception(
+            "伴奏分离功能升级中，暂时不可用。\n" +
+            "建议使用以下工具进行伴奏分离：\n" +
+            "1. 网页版: vocalremover.org\n" +
+            "2. 网页版: moises.ai\n" +
+            "3. 手机App: 小影、剪映（都有伴奏分离功能）"
+        )
     }
 
-    /**
-     * 声音克隆 - SiliconFlow
-     */
+    // ===== 声音克隆 - SiliconFlow =====
+
     suspend fun cloneVoice(
         baseUrl: String, apiKey: String, text: String,
         referenceAudioPath: String? = null, model: String = DEFAULT_MODEL
     ): String? {
         return executeWithRetry(taskName = "声音克隆") {
             val voiceId = if (!referenceAudioPath.isNullOrEmpty()) {
-                uploadReferenceAudio(baseUrl, apiKey, referenceAudioPath, model) ?: throw Exception("参考音频上传失败")
+                uploadReferenceAudio(baseUrl, apiKey, referenceAudioPath, model)
+                    ?: throw Exception("参考音频上传失败")
             } else {
                 VOICE_PRESETS[0].voiceValue
             }
@@ -314,44 +346,7 @@ object ApiClient {
         }
     }
 
-    // ========== Replicate helpers ==========
-
-    private fun extractOutputAndSave(json: JSONObject, fileName: String): String? {
-        val output = json.opt("output") ?: return null
-        val downloadUrl = when (output) {
-            is JSONArray -> output.optString(0, null)
-            is String -> if (output.startsWith("http")) output else null
-            else -> null
-        }
-        return if (downloadUrl != null) downloadAndSave(downloadUrl, fileName) else null
-    }
-
-    private fun pollReplicateResult(token: String, predictionId: String, fileName: String): String? {
-        for (i in 0..60) {
-            Thread.sleep(5000)
-            val result = executeWithRetry(maxRetries = 3, taskName = "查询结果") {
-                val request = Request.Builder()
-                    .url("https://api.replicate.com/v1/predictions/$predictionId")
-                    .addHeader("Authorization", "Bearer $token")
-                    .build()
-                val response = client.newCall(request).execute()
-                if (response.isSuccessful) {
-                    JSONObject(response.body?.string() ?: "{}")
-                } else {
-                    throw IOException("查询状态失败: ${response.code}")
-                }
-            }
-
-            val status = result.optString("status", "")
-            when (status) {
-                "succeeded" -> return extractOutputAndSave(result, fileName)
-                "failed" -> throw Exception("任务失败: ${result.optString("error", "unknown")}")
-                "canceled" -> throw Exception("任务被取消")
-                // processing / starting → 继续轮询
-            }
-        }
-        throw Exception("等待超时（5分钟）")
-    }
+    // ===== 工具方法 =====
 
     private fun downloadAndSave(url: String, fileName: String): String? {
         return executeWithRetry(taskName = "下载结果") {
@@ -368,8 +363,6 @@ object ApiClient {
             }
         }
     }
-
-    // ========== SiliconFlow helpers ==========
 
     private fun uploadReferenceAudio(baseUrl: String, apiKey: String, audioPath: String, model: String): String? {
         val url = "${baseUrl.trimEnd('/')}/v1/audio/voice"
@@ -394,8 +387,7 @@ object ApiClient {
 
         val response = client.newCall(request).execute()
         if (response.isSuccessful) {
-            val responseBody = response.body?.string()
-            val json = JSONObject(responseBody)
+            val json = JSONObject(response.body?.string() ?: return null)
             return json.optString("uri", json.optString("id", json.optString("voice_id", null)))
         }
         return null

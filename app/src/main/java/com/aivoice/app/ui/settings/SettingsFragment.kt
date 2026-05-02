@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import com.aivoice.app.R
 import com.aivoice.app.api.ApiClient
 import com.aivoice.app.databinding.FragmentSettingsBinding
 import com.aivoice.app.util.IconManager
@@ -29,6 +28,9 @@ class SettingsFragment : Fragment() {
             saveSettings()
             Toast.makeText(requireContext(), "✅ 设置已保存", Toast.LENGTH_SHORT).show()
         }
+
+        // 图标切换
+        IconManager.setupIconGrid(requireContext(), binding.gridIcons, binding.imgCurrentIcon, binding.tvCurrentIconName)
     }
 
     private fun loadSettings() {
@@ -36,7 +38,7 @@ class SettingsFragment : Fragment() {
         binding.editApiKey.setText(prefs.getString("api_key", ""))
         binding.editBaseUrl.setText(prefs.getString("base_url", ApiClient.DEFAULT_BASE_URL))
         binding.editModel.setText(prefs.getString("model_name", ApiClient.DEFAULT_MODEL))
-        binding.editReplicateToken.setText(prefs.getString("replicate_token", ""))
+        binding.editMinimaxApiKey.setText(prefs.getString("minimax_api_key", ""))
     }
 
     private fun saveSettings() {
@@ -45,7 +47,7 @@ class SettingsFragment : Fragment() {
             putString("api_key", binding.editApiKey.text.toString().trim())
             putString("base_url", binding.editBaseUrl.text.toString().trim().ifEmpty { ApiClient.DEFAULT_BASE_URL })
             putString("model_name", binding.editModel.text.toString().trim().ifEmpty { ApiClient.DEFAULT_MODEL })
-            putString("replicate_token", binding.editReplicateToken.text.toString().trim())
+            putString("minimax_api_key", binding.editMinimaxApiKey.text.toString().trim())
             apply()
         }
     }
