@@ -46,6 +46,12 @@ object ApiClient {
 
     data class VoicePreset(val id: String, val name: String, val voiceValue: String)
 
+    /** 翻唱结果 */
+    data class CoverResult(
+        val audioPath: String,
+        val lyrics: String? = null
+    )
+
     private fun getDownloadDir(): File {
         val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "AIVoice")
         if (!dir.exists()) dir.mkdirs()
@@ -177,7 +183,7 @@ object ApiClient {
         songAudioPath: String,
         stylePrompt: String,
         model: String = "music-cover-free"
-    ): String? {
+    ): CoverResult? {
         val apiKey = cleanToken(minimaxApiKey)
         if (apiKey.isEmpty()) throw Exception("MiniMax API Key 为空")
 
@@ -245,8 +251,10 @@ object ApiClient {
         // status: 1=合成中, 2=已完成
         // 使用 output_format=url 时，音频 URL 在 data.audio 字段中
         if (status == 2) {
-            // 完成！提取音频
-            return extractAudioFromResponse(data)
+            // 完成！提取音频和歌词
+            val audioPath = extractAudioFromResponse(data)
+            val lyrics = extractLyrics(data)
+            return CoverResult(audioPath, lyrics)
         } else if (status == 1) {
             // 仍在合成中（理论上同步接口不应该出现这种情况，但以防万一）
             // 重新查询... 但 MiniMax 音乐接口没有 query endpoint
@@ -284,6 +292,41 @@ object ApiClient {
                 throw Exception("音频数据解码失败: ${e.message}")
             }
         }
+    }
+
+    /**
+     * 从翻唱结果中提取歌词（两行显示用）
+     */
+    private fun extractLyrics(data: JSONObject): String? {
+        // 尝试多种可能的歌词字段
+        val lyrics = data.optString("lyrics", "")
+            .ifEmpty { data.optString("text", "") }
+            .ifEmpty { data.optString("lyric", "") }
+        if (lyrics.isNotEmpty()) return lyrics
+
+        // 尝试从嵌套对象中提取
+        val subData = data.optJSONObject("extra_info")
+        if (subData != null) {
+            val subLyrics = subData.optString("lyrics", "")
+                .ifEmpty { subData.optString("text", "") }
+            if (subLyrics.isNotEmpty()) return subLyrics
+        }
+
+        // 尝试从歌词数组中提取
+        val lyricsArray = data.optJSONArray("lyrics_list")
+        if (lyricsArray != null && lyricsArray.length() > 0) {
+            val sb = StringBuilder()
+            for (i in 0 until minOf(lyricsArray.length(), 4)) {
+                val item = lyricsArray.optJSONObject(i) ?: continue
+                val line = item.optString("text", "").ifEmpty { item.optString("content", "") }
+                if (line.isNotEmpty()) {
+                    if (sb.isNotEmpty()) sb.append("\n")
+                    sb.append(line)
+                }
+            }
+            if (sb.isNotEmpty()) return sb.toString()
+        }
+        return null
     }
 
     // ===== 伴奏分离（暂用提示告知用户手动处理）=====
