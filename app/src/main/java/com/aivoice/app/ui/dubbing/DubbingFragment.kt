@@ -41,7 +41,49 @@ class DubbingFragment : Fragment() {
         binding.btnGenerate.setOnClickListener { generateSpeech() }
         binding.btnPlay.setOnClickListener { playAudio() }
         binding.btnShare.setOnClickListener { shareAudio() }
+        binding.btnPreviewVoice.setOnClickListener { previewVoice() }
         binding.layoutPlayback.visibility = View.GONE
+    }
+
+    private fun previewVoice() {
+        val prefs = requireContext().getSharedPreferences("api_settings", Context.MODE_PRIVATE)
+        val apiKey = prefs.getString("api_key", "") ?: ""
+        val baseUrl = prefs.getString("base_url", ApiClient.DEFAULT_BASE_URL) ?: ApiClient.DEFAULT_BASE_URL
+        val model = prefs.getString("model_name", ApiClient.DEFAULT_MODEL) ?: ApiClient.DEFAULT_MODEL
+        if (apiKey.isEmpty()) { Toast.makeText(requireContext(), "请先在设置中配置 API Key", Toast.LENGTH_SHORT).show(); return }
+
+        val selectedVoice = binding.spinnerVoice.selectedItemPosition
+        val voiceValue = ApiClient.VOICE_PRESETS[selectedVoice].voiceValue
+        val voiceName = ApiClient.VOICE_PRESETS[selectedVoice].name
+
+        // 固定试听文本，简短高效
+        val previewText = "你好，我是你的AI助手，很高兴认识你！"
+
+        binding.btnPreviewVoice.isEnabled = false
+        binding.btnPreviewVoice.text = "⏳ 试听中..."
+        binding.tvStatus.text = "🔊 正在试听 $voiceName..."
+
+        lifecycleScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    ApiClient.synthesizeSpeech(baseUrl, apiKey, previewText, model, voiceValue)
+                }
+                binding.btnPreviewVoice.isEnabled = true
+                binding.btnPreviewVoice.text = "🔊 试听"
+                if (result != null) {
+                    currentFilePath = result
+                    binding.tvStatus.text = "🔊 试听: $voiceName"
+                    binding.layoutPlayback.visibility = View.VISIBLE
+                    playAudio()
+                } else {
+                    binding.tvStatus.text = "❌ 试听失败，请检查 API Key"
+                }
+            } catch (e: Exception) {
+                binding.btnPreviewVoice.isEnabled = true
+                binding.btnPreviewVoice.text = "🔊 试听"
+                binding.tvStatus.text = "❌ 试听失败: ${e.message}"
+            }
+        }
     }
 
     private fun generateSpeech() {

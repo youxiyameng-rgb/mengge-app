@@ -14,10 +14,21 @@
         android:text="选择音色" android:textSize="14sp" android:textColor="#666666"
         android:layout_marginBottom="6dp" />
 
-    <Spinner android:id="@+id/spinner_voice"
-        android:layout_width="match_parent" android:layout_height="48dp"
-        android:background="@android:drawable/btn_dropdown"
-        android:layout_marginBottom="12dp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:layout_marginBottom="12dp">
+
+        <Spinner android:id="@+id/spinner_voice"
+            android:layout_width="0dp" android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="@android:drawable/btn_dropdown"
+            android:layout_marginEnd="8dp" />
+
+        <Button android:id="@+id/btn_preview_voice"
+            android:layout_width="wrap_content" android:layout_height="48dp"
+            android:text="🔊 试听" android:textSize="13sp"
+            android:backgroundTint="#FF9800"
+            android:minWidth="0dp" android:paddingStart="14dp" android:paddingEnd="14dp" />
+    </LinearLayout>
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent" android:layout_height="wrap_content"
