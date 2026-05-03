@@ -200,47 +200,6 @@
         android:layout_width="match_parent" android:layout_height="50dp"
         android:text="💾 保存设置" android:backgroundTint="#6C63FF" />
 
-    <!-- ====== 分割线 ====== -->
-    <View android:layout_width="match_parent" android:layout_height="1dp"
-        android:background="#E0E0E0" android:layout_marginTop="28dp" android:layout_marginBottom="20dp" />
-
-    <!-- ====== 图标更换区域 ====== -->
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:text="🎨 更换APP图标" android:textSize="22sp" android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
-
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:text="选择一个主题图标，切换后桌面图标会自动更换"
-        android:textSize="13sp" android:textColor="#888888" android:layout_marginBottom="16dp" />
-
-    <!-- 当前图标预览 -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:gravity="center_horizontal" android:orientation="vertical"
-        android:layout_marginBottom="16dp">
-        <ImageView android:id="@+id/img_current_icon"
-            android:layout_width="72dp" android:layout_height="72dp"
-            android:scaleType="fitCenter" />
-        <TextView android:id="@+id/tv_current_icon_name"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="当前图标" android:textSize="13sp" android:textColor="#666666"
-            android:layout_marginTop="6dp" />
-    </LinearLayout>
-
-    <!-- 图标选择网格 -->
-    <GridLayout android:id="@+id/grid_icons"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:columnCount="5"
-        android:rowCount="1"
-        android:layout_marginBottom="12dp"
-        android:layout_gravity="center_horizontal" />
-
-    <TextView android:id="@+id/tv_icon_hint"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="点击图标即可切换，桌面图标将在几秒后自动更新"
-        android:textSize="12sp" android:textColor="#999999"
-        android:gravity="center" android:layout_marginTop="8dp" />
-
     <!-- ====== 支持平台 ====== -->
     <View android:layout_width="match_parent" android:layout_height="1dp"
         android:background="#E0E0E0" android:layout_marginTop="24dp" android:layout_marginBottom="16dp" />
