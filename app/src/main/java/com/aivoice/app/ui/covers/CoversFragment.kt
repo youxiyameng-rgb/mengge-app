@@ -170,13 +170,19 @@ class CoversFragment : Fragment() {
         if (memoTuneLoaded) return
         memoTuneLoaded = true
 
+        // 允许用户手势触发的媒体自动播放
+        binding.webviewMemotune.setMediaPlaybackRequiresUserGesture(false)
+
         binding.webviewMemotune.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             allowFileAccess = true
+            allowContentAccess = true
             useWideViewPort = true
             loadWithOverviewMode = true
             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            mediaPlaybackRequiresUserGesture = false  // 允许音频自动播放
+            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
             userAgentString = userAgentString.replace("; wv", "") // 避免被认为是 WebView
         }
 
