@@ -1,5 +1,6 @@
 package com.aivoice.app.ui.covers
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -11,6 +12,10 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -76,12 +81,14 @@ class CoversFragment : Fragment() {
         return binding.root
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         binding.etSongDesc.setText(stylePresets[0].second)
         setupStyleChips()
         setupModelChips()
+        setupEngineTabs()
 
         binding.btnSelectSong.setOnClickListener {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -133,6 +140,61 @@ class CoversFragment : Fragment() {
             }
         }
         binding.chipFreeModel.isChecked = true
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupEngineTabs() {
+        binding.chipEngineMinimax.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                binding.chipEngineMemotune.isChecked = false
+                binding.layoutMinimax.visibility = View.VISIBLE
+                binding.layoutMemotune.visibility = View.GONE
+            }
+        }
+        binding.chipEngineMemotune.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                binding.chipEngineMinimax.isChecked = false
+                binding.layoutMinimax.visibility = View.GONE
+                binding.layoutMemotune.visibility = View.VISIBLE
+                initMemoTuneWebView()
+            }
+        }
+        // 默认选中 MiniMax
+        binding.chipEngineMinimax.isChecked = true
+    }
+
+    private var memoTuneLoaded = false
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun initMemoTuneWebView() {
+        if (memoTuneLoaded) return
+        memoTuneLoaded = true
+
+        binding.webviewMemotune.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            allowFileAccess = true
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            userAgentString = userAgentString.replace("; wv", "") // 避免被认为是 WebView
+        }
+
+        binding.webviewMemotune.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                return false // 在 WebView 内加载
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                binding.progressWebview.visibility = View.GONE
+            }
+        }
+
+        binding.webviewMemotune.webChromeClient = WebChromeClient()
+
+        binding.progressWebview.visibility = View.VISIBLE
+        binding.webviewMemotune.loadUrl("https://memotune.com/zh-CN/ai-voice-cover")
     }
 
     private fun setupStyleChips() {
@@ -390,6 +452,12 @@ class CoversFragment : Fragment() {
 
     override fun onDestroyView() {
         releaseMediaPlayer()
+        if (memoTuneLoaded) {
+            try {
+                binding.webviewMemotune.stopLoading()
+                binding.webviewMemotune.destroy()
+            } catch (_: Exception) {}
+        }
         super.onDestroyView()
         _binding = null
     }
