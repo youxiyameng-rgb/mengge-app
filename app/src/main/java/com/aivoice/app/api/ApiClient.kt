@@ -252,7 +252,7 @@ object ApiClient {
         // 使用 output_format=url 时，音频 URL 在 data.audio 字段中
         if (status == 2) {
             // 完成！提取音频和歌词
-            val audioPath = extractAudioFromResponse(data)
+            val audioPath = extractAudioFromResponse(data) ?: throw Exception("未找到音频数据")
             val lyrics = extractLyrics(data)
             return CoverResult(audioPath, lyrics)
         } else if (status == 1) {
