@@ -15,5 +15,4 @@ local.properties
 /app/release
 /android-sdk
 gen_keystore.py
-release-key.pem
 release-key.jks

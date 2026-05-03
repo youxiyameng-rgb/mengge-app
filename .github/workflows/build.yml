@@ -25,6 +25,19 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
+    - name: Convert PKCS12 to JKS
+      run: |
+        keytool -importkeystore \
+          -srckeystore app/release-key.p12 \
+          -srcstoretype PKCS12 \
+          -srcstorepass mengge123 \
+          -srcalias mengge \
+          -destkeystore app/release-key.jks \
+          -deststoretype JKS \
+          -deststorepass mengge123 \
+          -destalias mengge \
+          -noprompt
+
     - name: Build Release APK
       run: ./gradlew assembleRelease
 
