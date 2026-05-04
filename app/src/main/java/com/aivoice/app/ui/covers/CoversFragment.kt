@@ -170,9 +170,6 @@ class CoversFragment : Fragment() {
         if (memoTuneLoaded) return
         memoTuneLoaded = true
 
-        // 允许用户手势触发的媒体自动播放
-        binding.webviewMemotune.setMediaPlaybackRequiresUserGesture(false)
-
         binding.webviewMemotune.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
