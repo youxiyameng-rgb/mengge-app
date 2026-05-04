@@ -17,7 +17,8 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("release-key.jks")
+            storeFile file("release-key.p12")
+            storeType 'PKCS12'
             storePassword 'mengge123'
             keyAlias 'mengge'
             keyPassword 'mengge123'
