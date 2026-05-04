@@ -190,13 +190,30 @@ class CoversFragment : Fragment() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                binding.progressWebview.visibility = View.GONE
+                // 注入JS：确保Web Audio API的AudioContext正常工作
+                view?.evaluateJavascript("""
+                    (function() {
+                        document.querySelectorAll('audio,video').forEach(function(el) {
+                            el.setAttribute('preload','auto');
+                        });
+                        document.addEventListener('click', function() {
+                            if (window.AudioContext || window.webkitAudioContext) {
+                                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                                if (ctx.state === 'suspended') { ctx.resume(); }
+                            }
+                        }, { once: true });
+                    })();
+                """, null)
             }
         }
 
-        binding.webviewMemotune.webChromeClient = WebChromeClient()
+        binding.webviewMemotune.webChromeClient = object : WebChromeClient() {
+            override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
+                // 自动授予音频播放权限
+                request?.grant(request.resources)
+            }
+        }
 
-        binding.progressWebview.visibility = View.VISIBLE
         binding.webviewMemotune.loadUrl("https://memotune.com/zh-CN/ai-voice-cover")
     }
 
