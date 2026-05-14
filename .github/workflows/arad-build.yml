@@ -1,0 +1,43 @@
+name: Android Build (AradWarriorH5)
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Decode Keystore (If Secret Exists)
+        if: ${{ secrets.KEYSTORE_FILE != '' }}
+        run: |
+          mkdir -p app/certs
+          echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > app/certs/release-key.p12
+          echo "✅ Keystore restored from Secrets"
+
+      - name: Grant Execute Permission
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AradWarriorH5-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 7
